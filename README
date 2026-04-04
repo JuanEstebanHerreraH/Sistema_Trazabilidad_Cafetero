@@ -1,0 +1,148 @@
+# ☕ Café Almacén
+
+Sistema de gestión de inventario, producción y ventas para café especial. Desarrollado con Next.js 16, Supabase y TypeScript.
+
+## Tecnologías
+
+- **Next.js 16** — Framework React con App Router
+- **Supabase** — Base de datos PostgreSQL + autenticación
+- **TypeScript** — Tipado estático
+- **Vercel** — Hosting y despliegue
+
+## Módulos del sistema
+
+| Módulo | Descripción |
+|---|---|
+| Dashboard | Resumen general con estadísticas y actividad reciente |
+| Productores | Gestión de productores de café |
+| Fincas | Fincas asociadas a cada productor |
+| Lotes de Café | Cosechas por finca, variedad y estado |
+| Procesos | Procesos de beneficio aplicados a los lotes |
+| Registros | Registro detallado de cada proceso |
+| Almacenes | Bodegas de almacenamiento |
+| Movimientos | Entradas, salidas y traslados de inventario |
+| Clientes | Compradores de café |
+| Ventas | Ventas realizadas a clientes |
+| Roles | Roles del sistema |
+| Usuarios | Gestión de usuarios con acceso |
+
+---
+
+## Instalación local
+
+### 1. Clonar el repositorio
+
+```bash
+git clone https://github.com/tu-usuario/cafe-almacen.git
+cd cafe-almacen
+```
+
+### 2. Instalar dependencias
+
+```bash
+npm install
+```
+
+### 3. Configurar variables de entorno
+
+Crea un archivo `.env.local` en la raíz del proyecto con las siguientes variables:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://xxxxxxxxxxxx.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyxxxxxxxxxxxxxxxxxxxxxxxx
+```
+
+Estas claves las encuentras en tu proyecto de Supabase en:  
+**Project Settings → API → Project URL y anon public key**
+
+### 4. Ejecutar en desarrollo
+
+```bash
+npm run dev
+```
+
+Abre [http://localhost:3000](http://localhost:3000) en el navegador.
+
+---
+
+## Despliegue en Vercel
+
+### 1. Subir a GitHub
+
+```bash
+git init
+git add .
+git commit -m "first commit"
+git branch -M main
+git remote add origin https://github.com/tu-usuario/cafe-almacen.git
+git push -u origin main
+```
+
+### 2. Conectar con Vercel
+
+1. Ve a [vercel.com](https://vercel.com) e inicia sesión con tu cuenta de GitHub
+2. Clic en **Add New Project**
+3. Selecciona el repositorio `cafe-almacen`
+4. En la sección **Environment Variables** agrega:
+   - `NEXT_PUBLIC_SUPABASE_URL` → tu URL de Supabase
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY` → tu anon key de Supabase
+5. Clic en **Deploy**
+
+En unos minutos tendrás la app disponible en una URL pública tipo `cafe-almacen.vercel.app`.
+
+---
+
+## Configuración de Supabase
+
+### Crear usuario de acceso
+
+1. Ve a tu proyecto en [supabase.com](https://supabase.com)
+2. **Authentication → Users → Add user → Create new user**
+3. Ingresa el email y contraseña del administrador
+
+### Tablas requeridas
+
+El sistema requiere las siguientes tablas en el schema `public`:
+
+`productor`, `finca`, `lote_cafe`, `proceso`, `registro_proceso`, `almacen`, `movimiento_inventario`, `cliente`, `venta`, `detalle_venta`, `rol`, `usuario`
+
+---
+
+## Estructura del proyecto
+
+```
+cafe-almacen/
+├── app/
+│   ├── globals.css
+│   ├── layout.tsx
+│   ├── page.tsx
+│   ├── login/
+│   │   └── page.tsx
+│   └── admin/
+│       ├── layout.tsx
+│       ├── page.tsx        ← Dashboard
+│       ├── clientes/
+│       ├── almacenes/
+│       ├── fincas/
+│       ├── lotes/
+│       ├── movimientos/
+│       ├── procesos/
+│       ├── productores/
+│       ├── registros/
+│       ├── roles/
+│       ├── usuarios/
+│       └── ventas/
+├── components/
+│   ├── Sidebar.tsx
+│   ├── CrudPage.tsx
+│   ├── Modal.tsx
+│   └── admin/
+│       └── *.tsx
+├── hooks/
+│   └── useCrud.ts
+├── utils/supabase/
+│   ├── client.ts
+│   └── server.ts
+├── proxy.ts
+└── .env.local          ← NO subir a GitHub
+```
