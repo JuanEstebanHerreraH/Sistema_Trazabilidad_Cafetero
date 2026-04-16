@@ -202,7 +202,7 @@ export default function PortalProductor({ usuario }: { usuario: any }) {
   )
 }
 
-function Field({ label, value, onChange, placeholder = '', type = 'text' }: any) {
+function Field({ label, value, onChange, placeholder = '', type = 'text' }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string; type?: string }) {
   return (
     <div>
       <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-soft)', display: 'block', marginBottom: '0.35rem' }}>{label}</label>
