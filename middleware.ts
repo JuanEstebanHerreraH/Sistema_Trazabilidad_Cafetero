@@ -41,10 +41,9 @@ export async function middleware(request: NextRequest) {
 
   const { pathname } = request.nextUrl
 
-  // ── Rutas protegidas: /admin/** ───────────────────────────────
-  if (pathname.startsWith('/admin')) {
+  // ── Rutas protegidas: /admin/** y /portal/** ──────────────────
+  if (pathname.startsWith('/admin') || pathname.startsWith('/portal')) {
     if (!user) {
-      // Sin sesión → redirigir al login
       const loginUrl = request.nextUrl.clone()
       loginUrl.pathname = '/login'
       return NextResponse.redirect(loginUrl)

@@ -15,12 +15,33 @@ export default function LoginPage() {
     if (!email || !password) { setError('Completa todos los campos.'); return }
     setLoading(true)
     setError(null)
-    const { error: err } = await supabase.auth.signInWithPassword({ email, password })
+
+    const { data, error: err } = await supabase.auth.signInWithPassword({ email, password })
+
     if (err) {
-      setError(err.message)
+      if (err.message.includes('Email not confirmed')) {
+        setError('Debes confirmar tu correo antes de ingresar. Revisa tu bandeja de entrada.')
+      } else if (err.message.includes('Invalid login credentials')) {
+        setError('Correo o contraseña incorrectos.')
+      } else {
+        setError(err.message)
+      }
       setLoading(false)
-    } else {
-      window.location.href = '/admin'
+      return
+    }
+
+    // Redirigir según el rol
+    try {
+      const { data: usr } = await supabase
+        .from('usuario')
+        .select('rol!idrol(nombre)')
+        .eq('auth_uid', data.user?.id)
+        .single()
+
+      const rolNombre = (usr as any)?.rol?.nombre ?? ''
+      window.location.href = rolNombre === 'Administrador' ? '/admin' : '/portal'
+    } catch {
+      window.location.href = '/portal'
     }
   }
 
