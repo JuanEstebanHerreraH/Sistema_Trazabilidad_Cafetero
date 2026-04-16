@@ -27,7 +27,7 @@ export default function PortalPage() {
 
       const { data, error: err } = await supabase
         .from('usuario')
-        .select('idusuario, nombre, email, estado_aprobacion, rol!idrol(nombre)')
+        .select('idusuario, nombre, email, estado_aprobacion, rol!usuario_idrol_fkey(nombre)')
         .eq('auth_uid', user.id)
         .single()
 

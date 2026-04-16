@@ -5,7 +5,7 @@ import CrudPage from '../../components/CrudPage'
 /**
  * Componente Usuarios — v2
  *
- * FIX: Se usa "rol!idrol(nombre)" en lugar de "rol(nombre)"
+ * FIX: Se usa "rol!usuario_idrol_fkey(nombre)" en lugar de "rol(nombre)"
  * porque la migración v2 agregó una segunda FK (rol_solicitado → rol),
  * lo que causaba ambigüedad en PostgREST de Supabase:
  *   "Could not embed because more than one relationship was found for 'usuario' and 'rol'"
@@ -39,7 +39,7 @@ export default function Usuarios() {
       title="Usuarios" subtitle="Usuarios del sistema" icon="👥"
       table="usuario" idField="idusuario"
       /* ✅ "!idrol" especifica explícitamente la columna del JOIN para evitar ambigüedad */
-      selectQuery="*, rol!idrol(nombre)"
+      selectQuery="*, rol!usuario_idrol_fkey(nombre)"
       orderBy="nombre"
       columns={[
         { key: 'idusuario',        label: '#' },

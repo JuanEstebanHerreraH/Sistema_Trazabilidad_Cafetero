@@ -34,7 +34,7 @@ export default function LoginPage() {
     try {
       const { data: usr } = await supabase
         .from('usuario')
-        .select('rol!idrol(nombre)')
+        .select('rol!usuario_idrol_fkey(nombre)')
         .eq('auth_uid', data.user?.id)
         .single()
 
