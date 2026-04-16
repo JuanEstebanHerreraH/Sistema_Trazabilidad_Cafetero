@@ -25,16 +25,36 @@ export default function PortalPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { window.location.href = '/login'; return }
 
-      const { data, error: err } = await supabase
+      // 1. Intentar por auth_uid
+      const byUid = await supabase
         .from('usuario')
         .select('idusuario, nombre, email, estado_aprobacion, rol!usuario_idrol_fkey(nombre)')
         .eq('auth_uid', user.id)
-        .single()
+        .maybeSingle()
 
-      if (err || !data) {
+      let data: any = byUid.data
+
+      // 2. Fallback por email (cuando auth_uid es NULL) y auto-vincular
+      if (!data && user.email) {
+        const byEmail = await supabase
+          .from('usuario')
+          .select('idusuario, nombre, email, estado_aprobacion, rol!usuario_idrol_fkey(nombre)')
+          .eq('email', user.email)
+          .maybeSingle()
+
+        if (byEmail.data) {
+          data = byEmail.data
+          // Vincular para futuras sesiones
+          await supabase
+            .from('usuario')
+            .update({ auth_uid: user.id })
+            .eq('idusuario', byEmail.data.idusuario)
+        }
+      }
+
+      if (!data) {
         setError('No se encontró tu perfil. Contacta al administrador.')
       } else {
-        // Si es admin, redirigir al panel
         const rolNombre = (data as any).rol?.nombre
         if (rolNombre === 'Administrador') {
           window.location.href = '/admin'
@@ -72,7 +92,6 @@ export default function PortalPage() {
 
   if (!usuario) return null
 
-  // Cuenta pendiente de aprobación
   if (usuario.estado_aprobacion === 'pendiente') return (
     <PendienteView nombre={usuario.nombre} onLogout={handleLogout} />
   )
@@ -85,7 +104,6 @@ export default function PortalPage() {
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
-      {/* ── Top bar ── */}
       <header style={{
         background: 'var(--bg-card)',
         borderBottom: '1px solid var(--border)',
@@ -117,7 +135,6 @@ export default function PortalPage() {
         </div>
       </header>
 
-      {/* ── Contenido por rol ── */}
       <main style={{ padding: '1.5rem', maxWidth: 1100, margin: '0 auto' }}>
         {rolNombre === 'Cliente'       && <PortalCliente       usuario={usuario} />}
         {rolNombre === 'Productor'     && <PortalProductor     usuario={usuario} />}

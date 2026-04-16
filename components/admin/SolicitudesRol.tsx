@@ -72,7 +72,7 @@ export default function SolicitudesRol() {
     setError(null)
     const { data, error: err } = await supabase
       .from('solicitud_rol')
-      .select('*, usuario(nombre, email, telefono)')
+      .select('*, usuario!solicitud_rol_idusuario_fkey(nombre, email, telefono)')
       .order('fecha_envio', { ascending: false })
 
     if (err) setError(err.message)
