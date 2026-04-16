@@ -50,7 +50,7 @@ const ROLES = [
   },
 ]
 
-// Campos por rol
+// Campos dinámicos por rol
 const CAMPOS_ROL: Record<string, { key: string; label: string; type?: string; placeholder?: string; required?: boolean }[]> = {
   Productor: [
     { key: 'nombre_finca',    label: 'Nombre de la finca',    required: true,  placeholder: 'Ej: Finca El Paraíso' },
@@ -82,15 +82,11 @@ export default function RegisterPage() {
   const [loading, setLoading]     = useState(false)
   const [error, setError]         = useState<string | null>(null)
 
-  // Paso 1: Datos base
   const [base, setBase] = useState<BaseForm>({
     nombre: '', email: '', password: '', confirmar: '', telefono: '',
   })
 
-  // Paso 2: Rol seleccionado
   const [rolSeleccionado, setRolSeleccionado] = useState<string | null>(null)
-
-  // Paso 3: Campos dinámicos del rol
   const [camposRol, setCamposRol] = useState<Record<string, string>>({})
 
   // ── Validaciones ──────────────────────────────────────────────────────────
@@ -104,13 +100,6 @@ export default function RegisterPage() {
     return true
   }
 
-  const validarRol = (): boolean => {
-    if (!rolSeleccionado) { setError('Selecciona un rol para continuar.'); return false }
-    return true
-  }
-
-  // ── Navegación entre pasos ────────────────────────────────────────────────
-
   const irAlRol = () => {
     setError(null)
     if (validarDatos()) setStep('rol')
@@ -118,9 +107,8 @@ export default function RegisterPage() {
 
   const irAlFormulario = () => {
     setError(null)
-    if (!validarRol()) return
+    if (!rolSeleccionado) { setError('Selecciona un rol para continuar.'); return }
     const rolInfo = ROLES.find(r => r.id === rolSeleccionado)
-    // Cliente no necesita formulario adicional
     if (rolInfo?.autoAprobado || !CAMPOS_ROL[rolSeleccionado!]) {
       registrar()
     } else {
@@ -139,11 +127,22 @@ export default function RegisterPage() {
       const { data: authData, error: authErr } = await supabase.auth.signUp({
         email: base.email.trim(),
         password: base.password,
-        options: { data: { nombre: base.nombre.trim() } },
+        options: {
+          data: { nombre: base.nombre.trim() },
+          // emailRedirectTo puede ajustarse según tu dominio
+        },
       })
-      if (authErr) throw new Error(authErr.message)
+
+      if (authErr) {
+        // Errores comunes traducidos
+        if (authErr.message.includes('already registered')) {
+          throw new Error('Este correo ya está registrado. Intenta iniciar sesión.')
+        }
+        throw new Error(authErr.message)
+      }
 
       const authUid = authData.user?.id
+      const needsConfirmation = !authData.session // si no hay sesión, Supabase envió email de confirmación
 
       // 2. Obtener id del rol desde la tabla pública
       const { data: rolData } = await supabase
@@ -162,9 +161,9 @@ export default function RegisterPage() {
         .insert({
           nombre:            base.nombre.trim(),
           email:             base.email.trim(),
-          password_hash:     '—', // la auth la maneja Supabase Auth
+          password_hash:     '—', // auth la maneja Supabase Auth
           telefono:          base.telefono.trim() || null,
-          idrol:             rolInfo?.autoAprobado ? idrol : null, // asignar solo si aprobado
+          idrol:             rolInfo?.autoAprobado ? idrol : null,
           rol_solicitado:    idrol,
           estado_aprobacion: estadoAprobacion,
           auth_uid:          authUid ?? null,
@@ -175,8 +174,8 @@ export default function RegisterPage() {
       if (userErr) throw new Error(userErr.message)
 
       // 4. Insertar solicitud de rol si es rol especial
-      if (!rolInfo?.autoAprobado && rolSeleccionado) {
-        const { error: solErr } = await supabase
+      if (!rolInfo?.autoAprobado && rolSeleccionado && CAMPOS_ROL[rolSeleccionado]) {
+        await supabase
           .from('solicitud_rol')
           .insert({
             idusuario:        usuarioData.idusuario,
@@ -184,7 +183,6 @@ export default function RegisterPage() {
             datos_formulario: camposRol,
             estado_revision:  'pendiente',
           })
-        if (solErr) console.warn('Error al crear solicitud:', solErr.message)
       }
 
       setStep('exito')
@@ -199,27 +197,24 @@ export default function RegisterPage() {
     setCamposRol(prev => ({ ...prev, [key]: value }))
 
   // ── Render ────────────────────────────────────────────────────────────────
-
   const rolActual = ROLES.find(r => r.id === rolSeleccionado)
 
   return (
     <div className="login-page">
       <div className="login-card register-card">
 
-        {/* ── Header ── */}
         <div className="login-header">
           <div className="login-icon">☕</div>
           <h1>Crear cuenta</h1>
           <p>Únete al sistema de trazabilidad</p>
         </div>
 
-        {/* ── Tabs ── */}
         <div className="auth-tabs">
           <Link href="/login" className="auth-tab">Iniciar sesión</Link>
           <span className="auth-tab active">Registrarse</span>
         </div>
 
-        {/* ── Indicador de pasos ── */}
+        {/* Indicador de pasos */}
         <div className="steps-indicator">
           {(['datos', 'rol', 'formulario'] as Step[]).map((s, i) => {
             const labels = ['Datos', 'Rol', 'Detalles']
@@ -241,99 +236,62 @@ export default function RegisterPage() {
           <div className="alert alert-error" style={{ marginBottom: '1rem' }}>⚠ {error}</div>
         )}
 
-        {/* ════════════════════════════════════════════════════════
-            PASO 1 — Datos personales
-        ════════════════════════════════════════════════════════ */}
+        {/* ── PASO 1: Datos personales ── */}
         {step === 'datos' && (
           <div className="register-step">
             <div className="form-grid-2">
               <div className="form-group" style={{ gridColumn: '1 / -1' }}>
                 <label className="form-label">Nombre completo <span className="form-required">*</span></label>
-                <input
-                  className="form-input"
-                  type="text"
-                  value={base.nombre}
+                <input className="form-input" type="text" value={base.nombre}
                   onChange={e => setBase(p => ({ ...p, nombre: e.target.value }))}
-                  placeholder="Ej: Juan Esteban Herrera"
-                />
+                  placeholder="Ej: Juan Esteban Herrera" autoComplete="name" />
               </div>
-
               <div className="form-group" style={{ gridColumn: '1 / -1' }}>
                 <label className="form-label">Correo electrónico <span className="form-required">*</span></label>
-                <input
-                  className="form-input"
-                  type="email"
-                  value={base.email}
+                <input className="form-input" type="email" value={base.email}
                   onChange={e => setBase(p => ({ ...p, email: e.target.value }))}
-                  placeholder="tu@email.com"
-                  autoComplete="email"
-                />
+                  placeholder="tu@email.com" autoComplete="email" />
               </div>
-
               <div className="form-group">
                 <label className="form-label">Contraseña <span className="form-required">*</span></label>
-                <input
-                  className="form-input"
-                  type="password"
-                  value={base.password}
+                <input className="form-input" type="password" value={base.password}
                   onChange={e => setBase(p => ({ ...p, password: e.target.value }))}
-                  placeholder="Mínimo 6 caracteres"
-                  autoComplete="new-password"
-                />
+                  placeholder="Mínimo 6 caracteres" autoComplete="new-password" />
               </div>
-
               <div className="form-group">
                 <label className="form-label">Confirmar contraseña <span className="form-required">*</span></label>
-                <input
-                  className="form-input"
-                  type="password"
-                  value={base.confirmar}
+                <input className="form-input" type="password" value={base.confirmar}
                   onChange={e => setBase(p => ({ ...p, confirmar: e.target.value }))}
-                  placeholder="Repite tu contraseña"
-                  autoComplete="new-password"
-                />
+                  placeholder="Repite tu contraseña" autoComplete="new-password" />
               </div>
-
               <div className="form-group" style={{ gridColumn: '1 / -1' }}>
                 <label className="form-label">Teléfono <span style={{ color: 'var(--text-dim)', fontWeight: 400 }}>(opcional)</span></label>
-                <input
-                  className="form-input"
-                  type="tel"
-                  value={base.telefono}
+                <input className="form-input" type="tel" value={base.telefono}
                   onChange={e => setBase(p => ({ ...p, telefono: e.target.value }))}
-                  placeholder="+57 300 000 0000"
-                />
+                  placeholder="+57 300 000 0000" />
               </div>
             </div>
-
-            <button
-              className="btn btn-primary"
+            <button className="btn btn-primary"
               style={{ width: '100%', justifyContent: 'center', marginTop: '0.5rem' }}
-              onClick={irAlRol}
-            >
+              onClick={irAlRol}>
               Continuar →
             </button>
           </div>
         )}
 
-        {/* ════════════════════════════════════════════════════════
-            PASO 2 — Selección de rol
-        ════════════════════════════════════════════════════════ */}
+        {/* ── PASO 2: Selección de rol ── */}
         {step === 'rol' && (
           <div className="register-step">
             <p className="register-step-desc">
               Selecciona el rol con el que participarás en el sistema.
               Los roles especiales requieren validación del administrador.
             </p>
-
             <div className="roles-grid">
               {ROLES.map(rol => (
-                <button
-                  key={rol.id}
+                <button key={rol.id}
                   className={`rol-card ${rolSeleccionado === rol.id ? 'selected' : ''}`}
                   onClick={() => setRolSeleccionado(rol.id)}
-                  style={{ '--rol-color': rol.color } as any}
-                >
+                  style={{ '--rol-color': rol.color } as any}>
                   <div className="rol-card-icon">{rol.icon}</div>
                   <div className="rol-card-nombre">{rol.label}</div>
                   <div className="rol-card-desc">{rol.desc}</div>
@@ -344,25 +302,17 @@ export default function RegisterPage() {
                 </button>
               ))}
             </div>
-
             <div className="register-nav">
-              <button className="btn btn-secondary" onClick={() => { setError(null); setStep('datos') }}>
-                ← Atrás
-              </button>
-              <button
-                className="btn btn-primary"
-                onClick={irAlFormulario}
-                disabled={!rolSeleccionado || loading}
-              >
+              <button className="btn btn-secondary" onClick={() => { setError(null); setStep('datos') }}>← Atrás</button>
+              <button className="btn btn-primary" onClick={irAlFormulario}
+                disabled={!rolSeleccionado || loading}>
                 {loading ? 'Registrando…' : (rolActual?.autoAprobado ? 'Registrarme' : 'Continuar →')}
               </button>
             </div>
           </div>
         )}
 
-        {/* ════════════════════════════════════════════════════════
-            PASO 3 — Formulario específico del rol
-        ════════════════════════════════════════════════════════ */}
+        {/* ── PASO 3: Formulario específico del rol ── */}
         {step === 'formulario' && rolSeleccionado && CAMPOS_ROL[rolSeleccionado] && (
           <div className="register-step">
             <div className="rol-info-banner" style={{ '--rol-color': rolActual?.color } as any}>
@@ -372,61 +322,44 @@ export default function RegisterPage() {
                 <div className="rol-info-sub">Completa los datos adicionales para tu solicitud</div>
               </div>
             </div>
-
             <div className="form-grid-2" style={{ marginTop: '1rem' }}>
               {CAMPOS_ROL[rolSeleccionado].map(campo => (
-                <div
-                  key={campo.key}
-                  className="form-group"
-                  style={{ gridColumn: campo.type === 'number' ? undefined : '1 / -1' }}
-                >
+                <div key={campo.key} className="form-group"
+                  style={{ gridColumn: campo.type === 'number' ? undefined : '1 / -1' }}>
                   <label className="form-label">
                     {campo.label}
                     {campo.required && <span className="form-required">*</span>}
                   </label>
-                  <input
-                    className="form-input"
-                    type={campo.type ?? 'text'}
+                  <input className="form-input" type={campo.type ?? 'text'}
                     value={camposRol[campo.key] ?? ''}
                     onChange={e => handleCampoRol(campo.key, e.target.value)}
-                    placeholder={campo.placeholder ?? ''}
-                  />
+                    placeholder={campo.placeholder ?? ''} />
                 </div>
               ))}
             </div>
-
             <div className="register-nav">
-              <button className="btn btn-secondary" onClick={() => { setError(null); setStep('rol') }}>
-                ← Atrás
-              </button>
-              <button
-                className="btn btn-primary"
-                onClick={registrar}
-                disabled={loading}
-              >
-                {loading ? 'Enviando solicitud…' : 'Enviar solicitud'}
+              <button className="btn btn-secondary" onClick={() => { setError(null); setStep('rol') }}>← Atrás</button>
+              <button className="btn btn-primary" onClick={registrar} disabled={loading}>
+                {loading ? 'Enviando…' : 'Enviar solicitud'}
               </button>
             </div>
           </div>
         )}
 
-        {/* ════════════════════════════════════════════════════════
-            ÉXITO
-        ════════════════════════════════════════════════════════ */}
+        {/* ── ÉXITO ── */}
         {step === 'exito' && (
           <div className="register-exito">
-            <div className="exito-icon">
-              {rolActual?.autoAprobado ? '✅' : '⏳'}
-            </div>
-            <h2>
-              {rolActual?.autoAprobado ? '¡Bienvenido!' : 'Solicitud enviada'}
-            </h2>
+            <div className="exito-icon">{rolActual?.autoAprobado ? '✅' : '⏳'}</div>
+            <h2>{rolActual?.autoAprobado ? '¡Bienvenido!' : 'Solicitud enviada'}</h2>
             <p>
               {rolActual?.autoAprobado
-                ? 'Tu cuenta fue creada exitosamente. Ya puedes iniciar sesión.'
-                : `Tu solicitud como ${rolSeleccionado} fue enviada. Un administrador la revisará pronto. Recibirás acceso una vez aprobada.`
+                ? 'Tu cuenta fue creada. Si recibes un correo de confirmación, verifica tu bandeja de entrada antes de iniciar sesión.'
+                : `Tu solicitud como ${rolSeleccionado} fue enviada. Un administrador la revisará pronto. Es posible que necesites confirmar tu correo electrónico primero.`
               }
             </p>
+            <div className="exito-tip">
+              💡 Si no puedes iniciar sesión, revisa tu bandeja de entrada (o spam) para confirmar tu correo electrónico.
+            </div>
             <Link href="/login" className="btn btn-primary" style={{ marginTop: '0.5rem' }}>
               Ir al inicio de sesión
             </Link>
