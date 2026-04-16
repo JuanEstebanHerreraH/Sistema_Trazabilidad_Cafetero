@@ -178,7 +178,7 @@ function InputField({ label, value, onChange, placeholder = '', type = 'text' }:
   )
 }
 
-function SelectField({ label, value, onChange, options {}: never
+function SelectField({ label, value, onChange, options }: { label: string; value: string; onChange: (v: string) => void; options: { value: string | number; label: string }[] }) {
   return (
     <div>
       <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-soft)', display: 'block', marginBottom: '0.35rem' }}>{label}</label>
