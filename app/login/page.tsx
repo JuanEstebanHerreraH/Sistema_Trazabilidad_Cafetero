@@ -1,5 +1,6 @@
 'use client'
 import { useState } from 'react'
+import Link from 'next/link'
 import { createClient } from '../../utils/supabase/client'
 
 export default function LoginPage() {
@@ -26,10 +27,17 @@ export default function LoginPage() {
   return (
     <div className="login-page">
       <div className="login-card">
+        {/* ── Header ── */}
         <div className="login-header">
           <div className="login-icon">☕</div>
           <h1>Café Almacén</h1>
-          <p>Ingresa tus credenciales para continuar</p>
+          <p>Sistema de trazabilidad cafetera</p>
+        </div>
+
+        {/* ── Tabs de autenticación ── */}
+        <div className="auth-tabs">
+          <span className="auth-tab active">Iniciar sesión</span>
+          <Link href="/register" className="auth-tab">Registrarse</Link>
         </div>
 
         {error && (
@@ -37,7 +45,7 @@ export default function LoginPage() {
         )}
 
         <div className="form-group">
-          <label className="form-label">Email</label>
+          <label className="form-label">Correo electrónico</label>
           <input
             className="form-input"
             type="email"
@@ -67,8 +75,13 @@ export default function LoginPage() {
           onClick={handleLogin}
           disabled={loading}
         >
-          {loading ? 'Ingresando…' : 'Ingresar'}
+          {loading ? 'Ingresando…' : 'Ingresar al sistema'}
         </button>
+
+        <p className="auth-switch-text">
+          ¿No tienes cuenta?{' '}
+          <Link href="/register" className="auth-switch-link">Regístrate aquí</Link>
+        </p>
       </div>
     </div>
   )
