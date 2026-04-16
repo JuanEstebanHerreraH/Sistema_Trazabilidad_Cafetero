@@ -1,4 +1,7 @@
 'use client'
+
+interface UsuarioPortal { idusuario: number; nombre: string; email: string; estado_aprobacion: string }
+
 import { useEffect, useState } from 'react'
 import { createClient } from '../../utils/supabase/client'
 
@@ -26,7 +29,7 @@ const ESTADO_CFG: Record<string, { label: string; color: string; bg: string }> =
   exportado:  { label: 'Exportado',   color: 'var(--purple)', bg: 'var(--purple-bg)' },
 }
 
-export default function PortalProductor({ usuario }: { usuario: any }) {
+export default function PortalProductor({ usuario }: { usuario: UsuarioPortal }) {
   const supabase = createClient()
   const [fincas, setFincas]   = useState<Finca[]>([])
   const [lotes, setLotes]     = useState<Lote[]>([])

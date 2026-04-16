@@ -1,4 +1,7 @@
 'use client'
+
+interface UsuarioPortal { idusuario: number; nombre: string; email: string; estado_aprobacion: string }
+
 import { useEffect, useState } from 'react'
 import { createClient } from '../../utils/supabase/client'
 
@@ -11,7 +14,7 @@ interface RegistroProceso {
   proceso: { nombre: string; descripcion: string | null } | null
 }
 
-export default function PortalCatador({ usuario }: { usuario: any }) {
+export default function PortalCatador({ usuario }: { usuario: UsuarioPortal }) {
   const supabase = createClient()
   const [registros, setRegistros] = useState<RegistroProceso[]>([])
   const [loading, setLoading]     = useState(true)
@@ -152,7 +155,7 @@ export default function PortalCatador({ usuario }: { usuario: any }) {
   )
 }
 
-function InputField({ label, value, onChange, placeholder = '', type = 'text' }: any) {
+function InputField({ label, value, onChange, placeholder = '', type = 'text' }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string; type?: string }) {
   return (
     <div>
       <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-soft)', display: 'block', marginBottom: '0.35rem' }}>{label}</label>
@@ -161,13 +164,13 @@ function InputField({ label, value, onChange, placeholder = '', type = 'text' }:
   )
 }
 
-function SelectField({ label, value, onChange, options }: any) {
+function SelectField({ label, value, onChange, options }: { label: string; value: string; onChange: (v: string) => void; options: { value: string | number; label: string }[] }) {
   return (
     <div>
       <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-soft)', display: 'block', marginBottom: '0.35rem' }}>{label}</label>
       <select style={{ width: '100%', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', padding: '0.48rem 0.75rem', color: 'var(--text)', fontSize: '0.85rem' }} value={value} onChange={e => onChange(e.target.value)}>
         <option value="">— Selecciona —</option>
-        {options.map((o: any) => <option key={o.value} value={o.value}>{o.label}</option>)}
+        {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
       </select>
     </div>
   )

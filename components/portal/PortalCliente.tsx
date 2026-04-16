@@ -1,4 +1,7 @@
 'use client'
+
+interface UsuarioPortal { idusuario: number; nombre: string; email: string; estado_aprobacion: string }
+
 import { useEffect, useState } from 'react'
 import { createClient } from '../../utils/supabase/client'
 
@@ -19,7 +22,7 @@ interface Venta {
   notas: string | null
 }
 
-export default function PortalCliente({ usuario }: { usuario: any }) {
+export default function PortalCliente({ usuario }: { usuario: UsuarioPortal }) {
   const supabase = createClient()
   const [lotes, setLotes]     = useState<Lote[]>([])
   const [ventas, setVentas]   = useState<Venta[]>([])
