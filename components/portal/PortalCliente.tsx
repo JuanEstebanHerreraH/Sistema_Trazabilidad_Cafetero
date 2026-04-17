@@ -49,16 +49,31 @@ export default function PortalCliente({ usuario }: { usuario: UsuarioPortal }) {
   const [exitoMsg, setExitoMsg]   = useState<string | null>(null)
 
   const cargar = useCallback(async () => {
-    let { data: clienteRow } = await supabase
-      .from('cliente').select('idcliente').eq('email', usuario.email).maybeSingle()
+    // 1. Buscar cliente por email O por nombre (para cubrir registros creados desde admin)
+    let { data: clienteRows } = await supabase
+      .from('cliente').select('idcliente, email, nombre')
+      .or(`email.eq.${usuario.email},nombre.eq.${usuario.nombre}`)
+
+    let clienteRow = clienteRows?.find(c => c.email === usuario.email)
+      ?? clienteRows?.[0]
+      ?? null
 
     if (!clienteRow) {
       const { data: nuevo } = await supabase
         .from('cliente').insert({ nombre: usuario.nombre, email: usuario.email })
         .select('idcliente').single()
-      clienteRow = nuevo
+      clienteRow = nuevo as any
+    } else if (!clienteRow.email) {
+      // Si existe pero sin email, vincular
+      await supabase.from('cliente').update({ email: usuario.email }).eq('idcliente', clienteRow.idcliente)
     }
-    setIdCliente(clienteRow?.idcliente ?? null)
+
+    const mainId = clienteRow?.idcliente ?? null
+    setIdCliente(mainId)
+
+    // Recopilar TODOS los IDs de cliente que podrían tener ventas de este usuario
+    const allClienteIds = [...new Set((clienteRows ?? []).map(c => c.idcliente).filter(Boolean))]
+    if (mainId && !allClienteIds.includes(mainId)) allClienteIds.push(mainId)
 
     const [{ data: l }, { data: v }] = await Promise.all([
       supabase
@@ -72,13 +87,13 @@ export default function PortalCliente({ usuario }: { usuario: UsuarioPortal }) {
         .gt('peso_kg', 0)
         .order('fecha_cosecha', { ascending: false }),
 
-      clienteRow?.idcliente
+      allClienteIds.length > 0
         ? supabase
             .from('venta')
             .select(`idventa, fecha_venta, total_kg, precio_kg, notas,
               detalle_venta(iddetalle_venta, cantidad, precio_venta,
                 lote_cafe(variedad, finca(nombre)))`)
-            .eq('idcliente', clienteRow.idcliente)
+            .in('idcliente', allClienteIds)
             .order('fecha_venta', { ascending: false })
         : Promise.resolve({ data: [] }),
     ])

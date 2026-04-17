@@ -50,6 +50,10 @@ export default function PortalTransportista({ usuario }: { usuario: UsuarioPorta
   const [contenidoAlmacen, setContenidoAlmacen] = useState<{ id: number; data: ContenidoAlmacen[] } | null>(null)
   const [loadingContenido, setLoadingContenido] = useState(false)
 
+  // Contenido del almacén ORIGEN seleccionado (para filtrar lotes en salida/traslado)
+  const [contenidoOrigen, setContenidoOrigen] = useState<ContenidoAlmacen[]>([])
+  const [loadingOrigen, setLoadingOrigen] = useState(false)
+
   const [form, setForm]             = useState({ tipo: 'traslado', idlote_cafe: '', idalmacen_origen: '', idalmacen_destino: '', cantidad: '', notas: '' })
   const [saving, setSaving]         = useState(false)
   const [errorForm, setErrorForm]   = useState<string | null>(null)
@@ -88,6 +92,19 @@ export default function PortalTransportista({ usuario }: { usuario: UsuarioPorta
 
   useEffect(() => { cargar() }, [cargar])
 
+  // Cuando cambia el almacén origen, cargar sus lotes
+  useEffect(() => {
+    if ((form.tipo === 'salida' || form.tipo === 'traslado') && form.idalmacen_origen) {
+      setLoadingOrigen(true)
+      supabase.rpc('fn_contenido_almacen', { p_idalmacen: Number(form.idalmacen_origen) }).then(({ data }) => {
+        setContenidoOrigen((data ?? []) as ContenidoAlmacen[])
+        setLoadingOrigen(false)
+      })
+    } else {
+      setContenidoOrigen([])
+    }
+  }, [form.idalmacen_origen, form.tipo])
+
   const verContenidoAlmacen = async (idalmacen: number) => {
     if (contenidoAlmacen?.id === idalmacen) {
       setContenidoAlmacen(null)
@@ -107,6 +124,19 @@ export default function PortalTransportista({ usuario }: { usuario: UsuarioPorta
     if (Number(form.cantidad) <= 0) {
       setErrorForm('La cantidad debe ser mayor a 0.')
       return
+    }
+
+    // Validar que el lote esté en el almacén origen
+    if ((form.tipo === 'salida' || form.tipo === 'traslado') && form.idalmacen_origen && form.idlote_cafe) {
+      const loteEnOrigen = contenidoOrigen.find(c => c.idlote_cafe === Number(form.idlote_cafe))
+      if (!loteEnOrigen) {
+        setErrorForm('🚫 Ese lote no está en el almacén origen. Solo puedes mover lotes que estén dentro.')
+        return
+      }
+      if (Number(form.cantidad) > loteEnOrigen.kg_en_almacen) {
+        setErrorForm(`🚫 Solo hay ${loteEnOrigen.kg_en_almacen.toLocaleString('es-CO')} kg de "${loteEnOrigen.variedad}" en este almacén. No puedes mover ${Number(form.cantidad).toLocaleString('es-CO')} kg.`)
+        return
+      }
     }
 
     // Validar capacidad frontend
@@ -381,10 +411,26 @@ export default function PortalTransportista({ usuario }: { usuario: UsuarioPorta
 
             <div>
               <label style={lblS}>Lote de café *</label>
-              <select style={selS} value={form.idlote_cafe} onChange={e => setForm(p => ({ ...p, idlote_cafe: e.target.value }))}>
-                <option value="">— Selecciona —</option>
-                {lotes.map(l => <option key={l.idlote_cafe} value={l.idlote_cafe}>{l.variedad} · {l.peso_kg}kg · Estado: {l.estado} · #{l.idlote_cafe}</option>)}
-              </select>
+              {(form.tipo === 'salida' || form.tipo === 'traslado') && !form.idalmacen_origen ? (
+                <p style={{ fontSize: '0.78rem', color: 'var(--amber)', background: 'var(--amber-bg)', padding: '0.5rem 0.75rem', borderRadius: 'var(--r-md)' }}>⬆️ Primero selecciona un almacén origen para ver los lotes disponibles.</p>
+              ) : loadingOrigen && (form.tipo === 'salida' || form.tipo === 'traslado') ? (
+                <p style={{ fontSize: '0.78rem', color: 'var(--text-dim)' }}>Cargando lotes del almacén…</p>
+              ) : (
+                <select style={selS} value={form.idlote_cafe} onChange={e => setForm(p => ({ ...p, idlote_cafe: e.target.value }))}>
+                  <option value="">— Selecciona —</option>
+                  {(form.tipo === 'entrada'
+                    ? lotes
+                    : contenidoOrigen.map(c => ({ idlote_cafe: c.idlote_cafe, variedad: c.variedad, peso_kg: c.kg_en_almacen, estado: 'en almacén' }))
+                  ).map((l: any) => (
+                    <option key={l.idlote_cafe} value={l.idlote_cafe}>
+                      {l.variedad} · {l.peso_kg} kg {form.tipo !== 'entrada' ? 'en almacén' : `· ${l.estado}`} · #{l.idlote_cafe}
+                    </option>
+                  ))}
+                </select>
+              )}
+              {(form.tipo === 'salida' || form.tipo === 'traslado') && form.idalmacen_origen && contenidoOrigen.length === 0 && !loadingOrigen && (
+                <p style={{ fontSize: '0.74rem', color: 'var(--red)', marginTop: '0.3rem' }}>📭 Este almacén está vacío. No hay lotes para mover.</p>
+              )}
             </div>
 
             <div>
@@ -396,7 +442,7 @@ export default function PortalTransportista({ usuario }: { usuario: UsuarioPorta
               {(form.tipo === 'salida' || form.tipo === 'traslado') && (
                 <div>
                   <label style={lblS}>Almacén origen {form.tipo === 'traslado' ? '*' : ''}</label>
-                  <select style={selS} value={form.idalmacen_origen} onChange={e => setForm(p => ({ ...p, idalmacen_origen: e.target.value }))}>
+                  <select style={selS} value={form.idalmacen_origen} onChange={e => setForm(p => ({ ...p, idalmacen_origen: e.target.value, idlote_cafe: '', cantidad: '' }))}>
                     <option value="">— Ninguno —</option>
                     {almacenes.map(a => <option key={a.idalmacen} value={a.idalmacen}>{almacenLabel(a)}</option>)}
                   </select>
