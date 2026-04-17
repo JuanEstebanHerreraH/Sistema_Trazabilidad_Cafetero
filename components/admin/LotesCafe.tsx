@@ -35,8 +35,13 @@ export default function LotesCafe() {
       description: 'Día en que se recolectó el café en la finca.',
     },
     {
-      key: 'peso_kg', label: 'Peso inicial (kg)', type: 'number', required: true, step: '0.01', min: '0', placeholder: 'Ej: 2500.00',
-      description: 'Peso en kilogramos del lote al momento de la cosecha, antes de cualquier proceso.',
+      key: 'peso_kg', label: 'Peso / Stock (kg)', type: 'number', required: true, step: '0.01', min: '0', placeholder: 'Ej: 2500.00',
+      description: 'Peso en kilogramos disponible. Se descuenta automáticamente con cada compra del portal cliente.',
+    },
+    { section: 'Precio y estado' } as any,
+    {
+      key: 'precio_kg', label: 'Precio por kg (COP)', type: 'number', required: true, step: '0.01', min: '0', placeholder: 'Ej: 18500',
+      description: 'Precio fijo por kilogramo en pesos colombianos. El cliente NO puede modificarlo — solo puede elegir la cantidad a comprar.',
     },
     {
       key: 'estado', label: 'Estado del lote', type: 'select', required: true, options: ESTADOS,
@@ -56,7 +61,8 @@ export default function LotesCafe() {
         { key: 'idfinca',       label: 'Finca',      render: (_, r) => r.finca?.nombre || '—' },
         { key: 'productor',     label: 'Productor',  render: (_, r) => <span style={{color:'var(--text-dim)',fontSize:'0.82rem'}}>{r.finca?.productor?.nombre || '—'}</span> },
         { key: 'fecha_cosecha', label: 'Cosecha',    render: v => v ? new Date(v).toLocaleDateString('es-CO',{day:'2-digit',month:'short',year:'numeric'}) : '—' },
-        { key: 'peso_kg',       label: 'Peso',       render: v => <strong>{Number(v).toLocaleString('es-CO')} kg</strong> },
+        { key: 'peso_kg',       label: 'Stock',      render: v => <strong>{Number(v).toLocaleString('es-CO')} kg</strong> },
+        { key: 'precio_kg',     label: 'Precio/kg',  render: v => <span style={{color:'var(--primary)',fontWeight:600}}>${Number(v ?? 0).toLocaleString('es-CO')}</span> },
         { key: 'estado',        label: 'Estado',     render: v => <span className={`badge ${estadoBadge[v]??'badge-amber'}`}>{v?.replace('_',' ')}</span> },
       ]}
       fields={fields}

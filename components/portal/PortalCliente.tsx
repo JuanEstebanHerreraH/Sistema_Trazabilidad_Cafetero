@@ -11,6 +11,7 @@ interface Lote {
   fecha_cosecha: string
   peso_kg: number
   estado: string
+  precio_kg: number   // precio fijado por el admin — NO editable por el cliente
   finca: { nombre: string; ubicacion: string | null; productor: { nombre: string } | null } | null
   registro_proceso: { proceso: { nombre: string } | null }[]
 }
@@ -18,7 +19,6 @@ interface Lote {
 interface LineaCompra {
   lote: Lote
   cantidad: number
-  precio_kg: number
 }
 
 interface VentaHistorial {
@@ -49,43 +49,35 @@ export default function PortalCliente({ usuario }: { usuario: UsuarioPortal }) {
   const [exitoMsg, setExitoMsg]   = useState<string | null>(null)
 
   const cargar = useCallback(async () => {
-    // 1. Buscar/crear registro de cliente por email
     let { data: clienteRow } = await supabase
-      .from('cliente')
-      .select('idcliente')
-      .eq('email', usuario.email)
-      .maybeSingle()
+      .from('cliente').select('idcliente').eq('email', usuario.email).maybeSingle()
 
     if (!clienteRow) {
       const { data: nuevo } = await supabase
-        .from('cliente')
-        .insert({ nombre: usuario.nombre, email: usuario.email })
-        .select('idcliente')
-        .single()
+        .from('cliente').insert({ nombre: usuario.nombre, email: usuario.email })
+        .select('idcliente').single()
       clienteRow = nuevo
     }
     setIdCliente(clienteRow?.idcliente ?? null)
 
-    // 2. Cargar lotes disponibles + historial de ventas
     const [{ data: l }, { data: v }] = await Promise.all([
       supabase
         .from('lote_cafe')
         .select(`
-          idlote_cafe, variedad, fecha_cosecha, peso_kg, estado,
+          idlote_cafe, variedad, fecha_cosecha, peso_kg, estado, precio_kg,
           finca(nombre, ubicacion, productor(nombre)),
           registro_proceso(proceso(nombre))
         `)
         .eq('estado', 'disponible')
+        .gt('peso_kg', 0)
         .order('fecha_cosecha', { ascending: false }),
 
       clienteRow?.idcliente
         ? supabase
             .from('venta')
-            .select(`
-              idventa, fecha_venta, total_kg, precio_kg, notas,
+            .select(`idventa, fecha_venta, total_kg, precio_kg, notas,
               detalle_venta(iddetalle_venta, cantidad, precio_venta,
-                lote_cafe(variedad, finca(nombre)))
-            `)
+                lote_cafe(variedad, finca(nombre)))`)
             .eq('idcliente', clienteRow.idcliente)
             .order('fecha_venta', { ascending: false })
         : Promise.resolve({ data: [] }),
@@ -98,26 +90,25 @@ export default function PortalCliente({ usuario }: { usuario: UsuarioPortal }) {
 
   useEffect(() => { cargar() }, [cargar])
 
-  // Agregar al carrito
-  const agregarAlCarrito = (lote: Lote, cantidad: number, precio_kg: number) => {
+  const agregarAlCarrito = (lote: Lote, cantidad: number) => {
     setCarrito(prev => {
       const existe = prev.find(l => l.lote.idlote_cafe === lote.idlote_cafe)
-      if (existe) return prev.map(l => l.lote.idlote_cafe === lote.idlote_cafe ? { ...l, cantidad, precio_kg } : l)
-      return [...prev, { lote, cantidad, precio_kg }]
+      if (existe) return prev.map(l => l.lote.idlote_cafe === lote.idlote_cafe ? { ...l, cantidad } : l)
+      return [...prev, { lote, cantidad }]
     })
   }
 
   const quitarDelCarrito = (idlote: number) =>
     setCarrito(prev => prev.filter(l => l.lote.idlote_cafe !== idlote))
 
-  // Confirmar compra — escribe en BD real
+  // Confirmar compra — escribe en BD, descuenta stock real
   const confirmarCompra = async () => {
     if (!idCliente || carrito.length === 0) return
     setComprando(true)
     setErrorCompra(null)
     try {
       const totalKg    = carrito.reduce((s, l) => s + l.cantidad, 0)
-      const precioBase = carrito[0].precio_kg  // precio referencia
+      const precioBase = carrito[0].lote.precio_kg  // precio del lote, no editable
 
       // 1. Crear la venta
       const { data: ventaData, error: ventaErr } = await supabase
@@ -127,35 +118,37 @@ export default function PortalCliente({ usuario }: { usuario: UsuarioPortal }) {
           idcliente:   idCliente,
           total_kg:    totalKg,
           precio_kg:   precioBase,
-          notas:       `Compra portal cliente — ${carrito.map(l => l.lote.variedad).join(', ')}`,
+          notas: `Compra portal cliente — ${carrito.map(l => l.lote.variedad).join(', ')}`,
         })
-        .select('idventa')
-        .single()
+        .select('idventa').single()
       if (ventaErr) throw new Error(ventaErr.message)
 
       // 2. Insertar detalle_venta por cada lote
-      const detalles = carrito.map(l => ({
-        idventa:     ventaData.idventa,
-        idlote_cafe: l.lote.idlote_cafe,
-        cantidad:    l.cantidad,
-        precio_venta: l.precio_kg,
-      }))
-      const { error: detErr } = await supabase.from('detalle_venta').insert(detalles)
+      const { error: detErr } = await supabase.from('detalle_venta').insert(
+        carrito.map(l => ({
+          idventa:      ventaData.idventa,
+          idlote_cafe:  l.lote.idlote_cafe,
+          cantidad:     l.cantidad,
+          precio_venta: l.lote.precio_kg,
+        }))
+      )
       if (detErr) throw new Error(detErr.message)
 
-      // 3. Actualizar estado del lote a 'vendido' si se compra todo el peso
+      // 3. Descontar peso_kg de cada lote — si llega a 0 lo marca como vendido
       for (const linea of carrito) {
-        if (linea.cantidad >= linea.lote.peso_kg) {
-          await supabase
-            .from('lote_cafe')
-            .update({ estado: 'vendido' })
-            .eq('idlote_cafe', linea.lote.idlote_cafe)
-        }
+        const pesoRestante = linea.lote.peso_kg - linea.cantidad
+        await supabase
+          .from('lote_cafe')
+          .update({
+            peso_kg: Math.max(0, pesoRestante),
+            estado:  pesoRestante <= 0 ? 'vendido' : 'disponible',
+          })
+          .eq('idlote_cafe', linea.lote.idlote_cafe)
       }
 
       setCarrito([])
-      setExitoMsg(`✅ Compra #${ventaData.idventa} registrada correctamente. ¡Gracias!`)
-      setTimeout(() => { setExitoMsg(null); setTab('compras') }, 2500)
+      setExitoMsg(`✅ Compra #${ventaData.idventa} registrada. Stock actualizado en toda la plataforma.`)
+      setTimeout(() => { setExitoMsg(null); setTab('compras') }, 2800)
       await cargar()
     } catch (err: any) {
       setErrorCompra(err.message)
@@ -172,7 +165,7 @@ export default function PortalCliente({ usuario }: { usuario: UsuarioPortal }) {
   )
 
   const totalCarritoKg  = carrito.reduce((s, l) => s + l.cantidad, 0)
-  const totalCarritoCOP = carrito.reduce((s, l) => s + l.cantidad * l.precio_kg, 0)
+  const totalCarritoCOP = carrito.reduce((s, l) => s + l.cantidad * l.lote.precio_kg, 0)
   const totalCompradoKg = ventas.reduce((s, v) => s + (v.total_kg ?? 0), 0)
 
   return (
@@ -182,19 +175,19 @@ export default function PortalCliente({ usuario }: { usuario: UsuarioPortal }) {
           🤝 Bienvenido, {usuario.nombre}
         </h1>
         <p style={{ color: 'var(--text-dim)', fontSize: '0.88rem' }}>
-          Compra lotes de café directamente. Cada compra queda registrada en el sistema.
+          Compra lotes de café directamente. Cada compra descuenta el stock en tiempo real.
         </p>
       </div>
 
-      {/* Stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
         {[
-          { icon: '☕', label: 'Disponibles',      val: lotes.length,            color: 'var(--primary)' },
-          { icon: '🛒', label: 'En carrito',        val: carrito.length,          color: 'var(--amber)'   },
-          { icon: '📦', label: 'Mis compras',       val: ventas.length,           color: 'var(--green)'   },
-          { icon: '⚖️', label: 'Total adquirido',  val: `${totalCompradoKg} kg`, color: 'var(--blue)'    },
+          { icon: '☕', label: 'Disponibles',     val: lotes.length,            color: 'var(--primary)' },
+          { icon: '🛒', label: 'En carrito',       val: carrito.length,          color: 'var(--amber)'   },
+          { icon: '📦', label: 'Mis compras',      val: ventas.length,           color: 'var(--green)'   },
+          { icon: '⚖️', label: 'Total adquirido', val: `${totalCompradoKg} kg`, color: 'var(--blue)'    },
         ].map(s => (
-          <div key={s.label} style={{ background: 'var(--bg-card)', border: '1px solid var(--border-soft)', borderRadius: 'var(--r-lg)', padding: '0.9rem 1rem', cursor: s.label === 'En carrito' ? 'pointer' : 'default' }}
+          <div key={s.label}
+            style={{ background: 'var(--bg-card)', border: '1px solid var(--border-soft)', borderRadius: 'var(--r-lg)', padding: '0.9rem 1rem', cursor: s.label === 'En carrito' ? 'pointer' : 'default' }}
             onClick={() => s.label === 'En carrito' && carrito.length > 0 && setTab('carrito')}>
             <div style={{ fontSize: '1.3rem', marginBottom: '0.3rem' }}>{s.icon}</div>
             <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', fontWeight: 700, color: s.color }}>{s.val}</div>
@@ -203,7 +196,6 @@ export default function PortalCliente({ usuario }: { usuario: UsuarioPortal }) {
         ))}
       </div>
 
-      {/* Tabs */}
       <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.25rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.75rem' }}>
         {([
           ['catalogo', `☕ Catálogo (${lotes.length})`],
@@ -229,8 +221,7 @@ export default function PortalCliente({ usuario }: { usuario: UsuarioPortal }) {
             <input
               style={{ width: '100%', maxWidth: 380, background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', padding: '0.5rem 0.9rem', color: 'var(--text)', fontSize: '0.85rem' }}
               placeholder="🔍 Buscar por variedad, finca o productor…"
-              value={filtro}
-              onChange={e => setFiltro(e.target.value)}
+              value={filtro} onChange={e => setFiltro(e.target.value)}
             />
           </div>
           {lotesFiltrados.length === 0 ? (
@@ -242,7 +233,7 @@ export default function PortalCliente({ usuario }: { usuario: UsuarioPortal }) {
                   key={lote.idlote_cafe}
                   lote={lote}
                   enCarrito={carrito.some(l => l.lote.idlote_cafe === lote.idlote_cafe)}
-                  onAgregar={(cantidad, precio_kg) => { agregarAlCarrito(lote, cantidad, precio_kg); setTab('catalogo') }}
+                  onAgregar={cantidad => { agregarAlCarrito(lote, cantidad); setTab('catalogo') }}
                   onQuitar={() => quitarDelCarrito(lote.idlote_cafe)}
                 />
               ))}
@@ -251,76 +242,68 @@ export default function PortalCliente({ usuario }: { usuario: UsuarioPortal }) {
         </>
       ) : tab === 'carrito' ? (
         <CarritoView
-          carrito={carrito}
-          totalKg={totalCarritoKg}
-          totalCOP={totalCarritoCOP}
-          onQuitar={quitarDelCarrito}
-          onConfirmar={confirmarCompra}
-          comprando={comprando}
-          errorCompra={errorCompra}
+          carrito={carrito} totalKg={totalCarritoKg} totalCOP={totalCarritoCOP}
+          onQuitar={quitarDelCarrito} onConfirmar={confirmarCompra}
+          comprando={comprando} errorCompra={errorCompra}
           onVerCatalogo={() => setTab('catalogo')}
         />
+      ) : ventas.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-dim)', background: 'var(--bg-card)', borderRadius: 'var(--r-xl)', border: '1px dashed var(--border)' }}>
+          <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>🛒</div>
+          <p style={{ fontSize: '0.88rem', marginBottom: '0.5rem' }}>Aún no tienes compras registradas.</p>
+          <button className="btn btn-primary" style={{ marginTop: '0.75rem', fontSize: '0.82rem' }} onClick={() => setTab('catalogo')}>Ver catálogo</button>
+        </div>
       ) : (
-        /* Historial */
-        ventas.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-dim)', background: 'var(--bg-card)', borderRadius: 'var(--r-xl)', border: '1px dashed var(--border)' }}>
-            <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>🛒</div>
-            <p style={{ fontSize: '0.88rem', marginBottom: '0.5rem' }}>Aún no tienes compras registradas.</p>
-            <button className="btn btn-primary" style={{ marginTop: '0.75rem', fontSize: '0.82rem' }} onClick={() => setTab('catalogo')}>Ver catálogo</button>
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-            {ventas.map(v => (
-              <div key={v.idventa} style={{ background: 'var(--bg-card)', border: '1px solid var(--border-soft)', borderRadius: 'var(--r-lg)', padding: '1.15rem 1.25rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.6rem' }}>
-                  <div>
-                    <div style={{ fontWeight: 700, color: 'var(--text)', fontSize: '0.92rem' }}>
-                      Compra #{v.idventa}
-                      <span style={{ marginLeft: '0.5rem', padding: '0.1rem 0.5rem', borderRadius: '99px', fontSize: '0.68rem', background: 'var(--green-bg)', color: 'var(--green)', fontWeight: 700 }}>✓ Completada</span>
-                    </div>
-                    <div style={{ color: 'var(--text-dim)', fontSize: '0.78rem', marginTop: '0.1rem' }}>
-                      {new Date(v.fecha_venta).toLocaleDateString('es-CO', { dateStyle: 'long' })}
-                    </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+          {ventas.map(v => (
+            <div key={v.idventa} style={{ background: 'var(--bg-card)', border: '1px solid var(--border-soft)', borderRadius: 'var(--r-lg)', padding: '1.15rem 1.25rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.6rem' }}>
+                <div>
+                  <div style={{ fontWeight: 700, color: 'var(--text)', fontSize: '0.92rem' }}>
+                    Compra #{v.idventa}
+                    <span style={{ marginLeft: '0.5rem', padding: '0.1rem 0.5rem', borderRadius: '99px', fontSize: '0.68rem', background: 'var(--green-bg)', color: 'var(--green)', fontWeight: 700 }}>✓ Completada</span>
                   </div>
-                  <div style={{ textAlign: 'right' }}>
-                    {v.total_kg && <div style={{ fontWeight: 700, color: 'var(--primary)', fontSize: '1.05rem' }}>{v.total_kg} kg</div>}
-                    {v.total_kg && v.precio_kg && (
-                      <div style={{ color: 'var(--text-dim)', fontSize: '0.78rem' }}>
-                        ${(v.total_kg * v.precio_kg).toLocaleString('es-CO')} total
-                      </div>
-                    )}
+                  <div style={{ color: 'var(--text-dim)', fontSize: '0.78rem', marginTop: '0.1rem' }}>
+                    {new Date(v.fecha_venta).toLocaleDateString('es-CO', { dateStyle: 'long' })}
                   </div>
                 </div>
-                {v.detalle_venta?.length > 0 && (
-                  <div style={{ borderTop: '1px solid var(--border-soft)', paddingTop: '0.6rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-                    {v.detalle_venta.map(d => (
-                      <div key={d.iddetalle_venta} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-soft)' }}>
-                        <span>☕ {d.lote_cafe?.variedad ?? '—'}{d.lote_cafe?.finca ? ` · ${d.lote_cafe.finca.nombre}` : ''}</span>
-                        <span style={{ fontWeight: 600 }}>{d.cantidad} kg — ${(d.cantidad * d.precio_venta).toLocaleString('es-CO')}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {v.notas && <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)', marginTop: '0.4rem' }}>📝 {v.notas}</div>}
+                <div style={{ textAlign: 'right' }}>
+                  {v.total_kg && <div style={{ fontWeight: 700, color: 'var(--primary)', fontSize: '1.05rem' }}>{v.total_kg} kg</div>}
+                  {v.total_kg && v.precio_kg && (
+                    <div style={{ color: 'var(--text-dim)', fontSize: '0.78rem' }}>
+                      ${(v.total_kg * v.precio_kg).toLocaleString('es-CO')} total
+                    </div>
+                  )}
+                </div>
               </div>
-            ))}
-          </div>
-        )
+              {v.detalle_venta?.length > 0 && (
+                <div style={{ borderTop: '1px solid var(--border-soft)', paddingTop: '0.6rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                  {v.detalle_venta.map(d => (
+                    <div key={d.iddetalle_venta} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-soft)' }}>
+                      <span>☕ {d.lote_cafe?.variedad ?? '—'}{d.lote_cafe?.finca ? ` · ${d.lote_cafe.finca.nombre}` : ''}</span>
+                      <span style={{ fontWeight: 600 }}>{d.cantidad} kg — ${(d.cantidad * d.precio_venta).toLocaleString('es-CO')}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {v.notas && <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)', marginTop: '0.4rem' }}>📝 {v.notas}</div>}
+            </div>
+          ))}
+        </div>
       )}
     </div>
   )
 }
 
-// ── Tarjeta de lote con formulario de compra inline ──────────────────────────
+// ── Tarjeta de lote: precio fijo (read-only), solo se elige cantidad ──────────
 function LoteCard({ lote, enCarrito, onAgregar, onQuitar }: {
   lote: Lote
   enCarrito: boolean
-  onAgregar: (cantidad: number, precio_kg: number) => void
+  onAgregar: (cantidad: number) => void
   onQuitar: () => void
 }) {
-  const [abierto, setAbierto] = useState(false)
-  const [cantidad, setCantidad] = useState(50)
-  const [precio, setPrecio]     = useState(18500)
+  const [abierto, setAbierto]   = useState(false)
+  const [cantidad, setCantidad] = useState(Math.min(50, lote.peso_kg))
   const procesosUnicos = [...new Set(lote.registro_proceso?.map(r => r.proceso?.nombre).filter(Boolean))]
 
   return (
@@ -346,28 +329,28 @@ function LoteCard({ lote, enCarrito, onAgregar, onQuitar }: {
         {procesosUnicos.length > 0 && <Stat label="Proceso" value={procesosUnicos.join(', ')} />}
       </div>
 
-      {/* Formulario inline de compra */}
+      {/* Precio fijo — definido por el admin, el cliente NO puede modificarlo */}
+      <div style={{ background: 'var(--bg)', borderRadius: 'var(--r-md)', padding: '0.5rem 0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', fontWeight: 600 }}>Precio / kg</span>
+        <span style={{ fontWeight: 700, color: 'var(--primary)', fontSize: '0.95rem' }}>
+          ${(lote.precio_kg ?? 0).toLocaleString('es-CO')} COP
+        </span>
+      </div>
+
+      {/* Formulario: SOLO cantidad — precio es read-only */}
       {abierto && !enCarrito && (
         <div style={{ background: 'var(--bg)', borderRadius: 'var(--r-lg)', padding: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-            <div>
-              <label style={lblS}>Cantidad (kg) *</label>
-              <input type="number" style={inpS} value={cantidad} min={1} max={lote.peso_kg}
-                onChange={e => setCantidad(Math.min(lote.peso_kg, Math.max(1, Number(e.target.value))))} />
-              <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>Máx: {lote.peso_kg} kg</div>
-            </div>
-            <div>
-              <label style={lblS}>Precio/kg (COP) *</label>
-              <input type="number" style={inpS} value={precio} min={1}
-                onChange={e => setPrecio(Math.max(1, Number(e.target.value)))} />
-              <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
-                Total: ${(cantidad * precio).toLocaleString('es-CO')}
-              </div>
+          <div>
+            <label style={lblS}>Cantidad (kg) *</label>
+            <input type="number" style={inpS} value={cantidad} min={1} max={lote.peso_kg}
+              onChange={e => setCantidad(Math.min(lote.peso_kg, Math.max(1, Number(e.target.value))))} />
+            <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+              Máx disponible: {lote.peso_kg} kg · Total: <strong>${(cantidad * (lote.precio_kg ?? 0)).toLocaleString('es-CO')}</strong> COP
             </div>
           </div>
           <div style={{ display: 'flex', gap: '0.5rem' }}>
             <button style={{ flex: 1, ...btnSec }} onClick={() => setAbierto(false)}>Cancelar</button>
-            <button style={{ flex: 2, ...btnPri }} onClick={() => { onAgregar(cantidad, precio); setAbierto(false) }}>
+            <button style={{ flex: 2, ...btnPri }} onClick={() => { onAgregar(cantidad); setAbierto(false) }}>
               🛒 Agregar al carrito
             </button>
           </div>
@@ -414,11 +397,13 @@ function CarritoView({ carrito, totalKg, totalCOP, onQuitar, onConfirmar, compra
           <div key={l.lote.idlote_cafe} style={{ background: 'var(--bg-card)', border: '1px solid var(--border-soft)', borderRadius: 'var(--r-lg)', padding: '0.9rem 1.1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
             <div>
               <div style={{ fontWeight: 700, color: 'var(--text)', fontSize: '0.9rem' }}>☕ {l.lote.variedad}</div>
-              <div style={{ fontSize: '0.76rem', color: 'var(--text-dim)' }}>{l.lote.finca?.nombre ?? ''} · {l.cantidad} kg × ${l.precio_kg.toLocaleString('es-CO')}/kg</div>
+              <div style={{ fontSize: '0.76rem', color: 'var(--text-dim)' }}>
+                {l.lote.finca?.nombre ?? ''} · {l.cantidad} kg × ${(l.lote.precio_kg ?? 0).toLocaleString('es-CO')}/kg
+              </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
               <div style={{ fontWeight: 700, color: 'var(--primary)', fontSize: '1rem', textAlign: 'right' }}>
-                ${(l.cantidad * l.precio_kg).toLocaleString('es-CO')}
+                ${(l.cantidad * (l.lote.precio_kg ?? 0)).toLocaleString('es-CO')}
               </div>
               <button style={{ ...btnSec, fontSize: '0.74rem', padding: '0.25rem 0.5rem' }} onClick={() => onQuitar(l.lote.idlote_cafe)}>✕</button>
             </div>
@@ -435,19 +420,17 @@ function CarritoView({ carrito, totalKg, totalCOP, onQuitar, onConfirmar, compra
         </div>
       </div>
       <div style={{ background: 'var(--amber-bg)', border: '1px solid var(--amber)', borderRadius: 'var(--r-md)', padding: '0.8rem 1rem', marginBottom: '1.25rem', fontSize: '0.8rem', color: 'var(--amber)' }}>
-        💡 Al confirmar, la compra queda registrada en el sistema y el estado de los lotes se actualiza automáticamente.
+        💡 Al confirmar, la compra se registra en la BD y el stock del lote se descuenta automáticamente para todos los usuarios.
       </div>
       <button
         style={{ width: '100%', padding: '0.7rem', borderRadius: 'var(--r-md)', background: comprando ? 'var(--border)' : 'var(--primary)', color: 'var(--primary-fg)', border: 'none', fontWeight: 700, fontSize: '0.95rem', cursor: comprando ? 'not-allowed' : 'pointer' }}
-        onClick={onConfirmar}
-        disabled={comprando}>
+        onClick={onConfirmar} disabled={comprando}>
         {comprando ? '⏳ Procesando…' : '✓ Confirmar compra'}
       </button>
     </div>
   )
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
 const lblS: React.CSSProperties = { fontSize: '0.74rem', fontWeight: 600, color: 'var(--text-soft)', display: 'block', marginBottom: '0.25rem' }
 const inpS: React.CSSProperties = { width: '100%', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', padding: '0.4rem 0.6rem', color: 'var(--text)', fontSize: '0.85rem' }
 const btnPri: React.CSSProperties = { padding: '0.45rem 1rem', border: 'none', borderRadius: 'var(--r-md)', background: 'var(--primary)', color: 'var(--primary-fg)', fontWeight: 700, fontSize: '0.82rem', cursor: 'pointer' }
