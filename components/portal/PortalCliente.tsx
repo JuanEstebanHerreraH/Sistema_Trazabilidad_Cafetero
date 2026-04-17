@@ -101,16 +101,32 @@ export default function PortalCliente({ usuario }: { usuario: UsuarioPortal }) {
   const quitarDelCarrito = (idlote: number) =>
     setCarrito(prev => prev.filter(l => l.lote.idlote_cafe !== idlote))
 
-  // Confirmar compra — escribe en BD, descuenta stock real
+  // Confirmar compra — escribe en BD, el trigger descuenta stock automáticamente
   const confirmarCompra = async () => {
     if (!idCliente || carrito.length === 0) return
     setComprando(true)
     setErrorCompra(null)
     try {
+      // 0. Optimistic lock: re-verificar stock actual de cada lote
+      for (const linea of carrito) {
+        const { data: loteActual } = await supabase
+          .from('lote_cafe')
+          .select('peso_kg, estado')
+          .eq('idlote_cafe', linea.lote.idlote_cafe)
+          .single()
+
+        if (!loteActual || loteActual.estado !== 'disponible') {
+          throw new Error(`El lote "${linea.lote.variedad}" ya no está disponible. Otro usuario pudo haberlo comprado. Recarga la página.`)
+        }
+        if (loteActual.peso_kg < linea.cantidad) {
+          throw new Error(`El lote "${linea.lote.variedad}" solo tiene ${loteActual.peso_kg} kg disponibles (pediste ${linea.cantidad} kg). El stock cambió desde que lo agregaste al carrito.`)
+        }
+      }
+
       const totalKg    = carrito.reduce((s, l) => s + l.cantidad, 0)
       const precioBase = carrito[0].lote.precio_kg  // precio del lote, no editable
 
-      // 1. Crear la venta
+      // 1. Crear la venta (cabecera)
       const { data: ventaData, error: ventaErr } = await supabase
         .from('venta')
         .insert({
@@ -124,6 +140,8 @@ export default function PortalCliente({ usuario }: { usuario: UsuarioPortal }) {
       if (ventaErr) throw new Error(ventaErr.message)
 
       // 2. Insertar detalle_venta por cada lote
+      //    El trigger trg_descontar_stock_venta descuenta peso_kg automáticamente
+      //    El trigger trg_actualizar_total_venta actualiza totales de la venta
       const { error: detErr } = await supabase.from('detalle_venta').insert(
         carrito.map(l => ({
           idventa:      ventaData.idventa,
@@ -134,21 +152,11 @@ export default function PortalCliente({ usuario }: { usuario: UsuarioPortal }) {
       )
       if (detErr) throw new Error(detErr.message)
 
-      // 3. Descontar peso_kg de cada lote — si llega a 0 lo marca como vendido
-      for (const linea of carrito) {
-        const pesoRestante = linea.lote.peso_kg - linea.cantidad
-        await supabase
-          .from('lote_cafe')
-          .update({
-            peso_kg: Math.max(0, pesoRestante),
-            estado:  pesoRestante <= 0 ? 'vendido' : 'disponible',
-          })
-          .eq('idlote_cafe', linea.lote.idlote_cafe)
-      }
+      // (No necesitamos actualizar lote_cafe manualmente — el trigger lo hace)
 
       setCarrito([])
-      setExitoMsg(`✅ Compra #${ventaData.idventa} registrada. Stock actualizado en toda la plataforma.`)
-      setTimeout(() => { setExitoMsg(null); setTab('compras') }, 2800)
+      setExitoMsg(`✅ Compra #${ventaData.idventa} registrada (${totalKg} kg por $${(totalKg * precioBase).toLocaleString('es-CO')}). Stock actualizado automáticamente en toda la plataforma — admin, productores y transportistas ven los cambios al instante.`)
+      setTimeout(() => { setExitoMsg(null); setTab('compras') }, 3500)
       await cargar()
     } catch (err: any) {
       setErrorCompra(err.message)

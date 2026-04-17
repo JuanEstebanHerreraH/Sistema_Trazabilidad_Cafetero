@@ -20,7 +20,15 @@ interface AlmacenConStock {
   nombre: string
   ubicacion: string | null
   capacidad_kg: number | null
-  stock_actual: number  // calculado de movimientos
+  stock_actual: number
+  porcentaje_ocupacion: number | null
+  espacio_disponible: number | null
+}
+
+interface ContenidoAlmacen {
+  idlote_cafe: number
+  variedad: string
+  kg_en_almacen: number
 }
 
 const TIPO_CFG: Record<string, { icon: string; label: string; color: string; bg: string }> = {
@@ -38,6 +46,10 @@ export default function PortalTransportista({ usuario }: { usuario: UsuarioPorta
   const [filtroTipo, setFiltroTipo] = useState('')
   const [tab, setTab]               = useState<'movimientos' | 'almacenes' | 'nuevo'>('movimientos')
 
+  // Contenido expandido de almacén
+  const [contenidoAlmacen, setContenidoAlmacen] = useState<{ id: number; data: ContenidoAlmacen[] } | null>(null)
+  const [loadingContenido, setLoadingContenido] = useState(false)
+
   const [form, setForm]             = useState({ tipo: 'traslado', idlote_cafe: '', idalmacen_origen: '', idalmacen_destino: '', cantidad: '', notas: '' })
   const [saving, setSaving]         = useState(false)
   const [errorForm, setErrorForm]   = useState<string | null>(null)
@@ -45,7 +57,7 @@ export default function PortalTransportista({ usuario }: { usuario: UsuarioPorta
 
   const cargar = useCallback(async () => {
     setLoading(true)
-    const [{ data: m }, { data: l }, { data: a }, { data: allMovs }] = await Promise.all([
+    const [{ data: m }, { data: l }] = await Promise.all([
       supabase
         .from('movimiento_inventario')
         .select(`
@@ -57,38 +69,35 @@ export default function PortalTransportista({ usuario }: { usuario: UsuarioPorta
         .eq('idusuario_responsable', usuario.idusuario)
         .order('fecha_movimiento', { ascending: false }),
       supabase.from('lote_cafe').select('idlote_cafe, variedad, estado, peso_kg').in('estado', ['disponible', 'en_proceso']),
-      supabase.from('almacen').select('idalmacen, nombre, ubicacion, capacidad_kg'),
-      // Todos los movimientos para calcular stock por almacén
-      supabase.from('movimiento_inventario').select('idalmacen_origen, idalmacen_destino, cantidad, tipo'),
     ])
 
-    // Calcular stock por almacén
-    const stockMap: Record<number, number> = {}
-    ;(allMovs ?? []).forEach((mv: any) => {
-      if (mv.tipo === 'entrada' && mv.idalmacen_destino) {
-        stockMap[mv.idalmacen_destino] = (stockMap[mv.idalmacen_destino] ?? 0) + Number(mv.cantidad)
-      }
-      if (mv.tipo === 'salida' && mv.idalmacen_origen) {
-        stockMap[mv.idalmacen_origen] = (stockMap[mv.idalmacen_origen] ?? 0) - Number(mv.cantidad)
-      }
-      if (mv.tipo === 'traslado') {
-        if (mv.idalmacen_origen)  stockMap[mv.idalmacen_origen]  = (stockMap[mv.idalmacen_origen]  ?? 0) - Number(mv.cantidad)
-        if (mv.idalmacen_destino) stockMap[mv.idalmacen_destino] = (stockMap[mv.idalmacen_destino] ?? 0) + Number(mv.cantidad)
-      }
-    })
-
-    const almacenesConStock: AlmacenConStock[] = (a ?? []).map((alm: any) => ({
-      ...alm,
-      stock_actual: Math.max(0, stockMap[alm.idalmacen] ?? 0),
-    }))
+    // Cargar almacenes con stock desde la vista
+    const { data: almStock } = await supabase.from('v_almacen_stock').select('*').order('nombre')
+    if (almStock) {
+      setAlmacenes(almStock as AlmacenConStock[])
+    } else {
+      // Fallback sin vista
+      const { data: rawAlm } = await supabase.from('almacen').select('idalmacen, nombre, ubicacion, capacidad_kg')
+      setAlmacenes((rawAlm ?? []).map((a: any) => ({ ...a, stock_actual: 0, porcentaje_ocupacion: null, espacio_disponible: a.capacidad_kg ?? null })))
+    }
 
     setMovs((m ?? []) as any)
     setLotes(l ?? [])
-    setAlmacenes(almacenesConStock)
     setLoading(false)
   }, [usuario.idusuario])
 
   useEffect(() => { cargar() }, [cargar])
+
+  const verContenidoAlmacen = async (idalmacen: number) => {
+    if (contenidoAlmacen?.id === idalmacen) {
+      setContenidoAlmacen(null)
+      return
+    }
+    setLoadingContenido(true)
+    const { data } = await supabase.rpc('fn_contenido_almacen', { p_idalmacen: idalmacen })
+    setContenidoAlmacen({ id: idalmacen, data: (data ?? []) as ContenidoAlmacen[] })
+    setLoadingContenido(false)
+  }
 
   const guardar = async () => {
     if (!form.tipo || !form.idlote_cafe || !form.cantidad) {
@@ -99,6 +108,23 @@ export default function PortalTransportista({ usuario }: { usuario: UsuarioPorta
       setErrorForm('La cantidad debe ser mayor a 0.')
       return
     }
+
+    // Validar capacidad frontend
+    if (form.idalmacen_destino && (form.tipo === 'entrada' || form.tipo === 'traslado')) {
+      const destino = almacenes.find(a => a.idalmacen === Number(form.idalmacen_destino))
+      if (destino && destino.capacidad_kg && destino.capacidad_kg > 0) {
+        const espacioLibre = destino.espacio_disponible ?? (destino.capacidad_kg - destino.stock_actual)
+        if (Number(form.cantidad) > espacioLibre) {
+          setErrorForm(
+            `🚫 El almacén "${destino.nombre}" solo tiene ${espacioLibre.toLocaleString('es-CO')} kg disponibles. ` +
+            `Capacidad: ${destino.capacidad_kg.toLocaleString('es-CO')} kg, Stock actual: ${destino.stock_actual.toLocaleString('es-CO')} kg. ` +
+            `No se pueden agregar ${Number(form.cantidad).toLocaleString('es-CO')} kg.`
+          )
+          return
+        }
+      }
+    }
+
     if (form.tipo === 'traslado' && (!form.idalmacen_origen || !form.idalmacen_destino)) {
       setErrorForm('Un traslado requiere almacén origen y destino.')
       return
@@ -115,8 +141,6 @@ export default function PortalTransportista({ usuario }: { usuario: UsuarioPorta
     setErrorForm(null)
     setExitoMsg(null)
 
-    const loteSeleccionado = lotes.find(l => l.idlote_cafe === Number(form.idlote_cafe))
-
     const { error } = await supabase.from('movimiento_inventario').insert({
       tipo:                  form.tipo,
       cantidad:              Number(form.cantidad),
@@ -128,19 +152,28 @@ export default function PortalTransportista({ usuario }: { usuario: UsuarioPorta
       fecha_movimiento:      new Date().toISOString(),
     })
 
-    if (error) { setErrorForm(error.message); setSaving(false); return }
+    if (error) {
+      const msg = error.message || ''
+      if (msg.includes('CAPACIDAD_EXCEDIDA')) {
+        setErrorForm(`🚫 ${msg.replace(/.*CAPACIDAD_EXCEDIDA:\s*/, '').replace(/\s*CONTEXT:.*/, '')}`)
+      } else {
+        setErrorForm(msg)
+      }
+      setSaving(false)
+      return
+    }
 
     // Si es entrada, marcar lote como en_proceso
+    const loteSeleccionado = lotes.find(l => l.idlote_cafe === Number(form.idlote_cafe))
     if (form.tipo === 'entrada' && loteSeleccionado?.estado === 'disponible') {
       await supabase.from('lote_cafe').update({ estado: 'en_proceso' }).eq('idlote_cafe', Number(form.idlote_cafe))
     }
-    // Si es salida definitiva (sin almacén origen conocido → exportación), marcar exportado
     if (form.tipo === 'salida' && !form.idalmacen_destino) {
       await supabase.from('lote_cafe').update({ estado: 'exportado' }).eq('idlote_cafe', Number(form.idlote_cafe))
     }
 
     setSaving(false)
-    setExitoMsg(`✅ Movimiento de ${form.cantidad} kg registrado. Los almacenes y la BD están actualizados.`)
+    setExitoMsg(`✅ Movimiento de ${form.cantidad} kg registrado. Los almacenes y el stock están actualizados en toda la plataforma.`)
     setForm({ tipo: 'traslado', idlote_cafe: '', idalmacen_origen: '', idalmacen_destino: '', cantidad: '', notas: '' })
     setTimeout(() => { setExitoMsg(null); setTab('movimientos') }, 2000)
     await cargar()
@@ -149,6 +182,22 @@ export default function PortalTransportista({ usuario }: { usuario: UsuarioPorta
   const movsFiltrados = movs.filter(m => !filtroTipo || m.tipo === filtroTipo)
   const kgTotales     = movs.reduce((acc, m) => acc + (m.cantidad ?? 0), 0)
 
+  const getBarColor = (pct: number) => {
+    if (pct >= 95) return 'var(--red)'
+    if (pct >= 80) return 'var(--amber)'
+    if (pct >= 50) return 'var(--blue)'
+    return 'var(--green)'
+  }
+
+  const almacenLabel = (a: AlmacenConStock) => {
+    let label = `${a.nombre} (${a.stock_actual.toLocaleString('es-CO')} kg`
+    if (a.capacidad_kg && a.capacidad_kg > 0) {
+      label += ` / ${a.capacidad_kg.toLocaleString('es-CO')} kg`
+    }
+    label += ')'
+    return label
+  }
+
   return (
     <div>
       <div style={{ marginBottom: '1.5rem' }}>
@@ -156,7 +205,7 @@ export default function PortalTransportista({ usuario }: { usuario: UsuarioPorta
           🚛 Panel del Transportista — {usuario.nombre}
         </h1>
         <p style={{ color: 'var(--text-dim)', fontSize: '0.88rem' }}>
-          Registra movimientos de inventario. Cada operación actualiza el stock de almacenes en tiempo real.
+          Registra movimientos de inventario. Los cambios se reflejan en tiempo real en almacenes, admin y otros roles.
         </p>
       </div>
 
@@ -233,31 +282,72 @@ export default function PortalTransportista({ usuario }: { usuario: UsuarioPorta
           )}
         </>
       ) : tab === 'almacenes' ? (
-        /* Vista de stock por almacén */
+        /* Vista de stock por almacén con contenido expandible */
         almacenes.length === 0 ? <Empty mensaje="No hay almacenes registrados." /> : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '1rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1rem' }}>
             {almacenes.map(a => {
-              const pct = a.capacidad_kg ? Math.min(100, Math.round((a.stock_actual / a.capacidad_kg) * 100)) : null
-              const barColor = pct === null ? 'var(--primary)' : pct > 80 ? 'var(--red)' : pct > 50 ? 'var(--amber)' : 'var(--green)'
+              const pct = a.porcentaje_ocupacion ?? (a.capacidad_kg && a.capacidad_kg > 0 ? Math.round((a.stock_actual / a.capacidad_kg) * 100) : null)
+              const barColor = pct === null ? 'var(--primary)' : getBarColor(pct)
+              const isExpanded = contenidoAlmacen?.id === a.idalmacen
               return (
-                <div key={a.idalmacen} style={{ background: 'var(--bg-card)', border: '1px solid var(--border-soft)', borderRadius: 'var(--r-xl)', padding: '1.25rem' }}>
-                  <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1rem', color: 'var(--text)', marginBottom: '0.3rem' }}>🏪 {a.nombre}</div>
+                <div key={a.idalmacen} style={{
+                  background: 'var(--bg-card)',
+                  border: `1px solid ${(pct ?? 0) >= 100 ? 'var(--red)' : (pct ?? 0) >= 80 ? 'var(--amber)' : 'var(--border-soft)'}`,
+                  borderRadius: 'var(--r-xl)',
+                  padding: '1.25rem',
+                  transition: 'border-color 0.3s',
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.3rem' }}>
+                    <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1rem', color: 'var(--text)' }}>🏪 {a.nombre}</div>
+                    {pct !== null && pct >= 100 && <span style={{ padding: '0.1rem 0.4rem', borderRadius: '99px', fontSize: '0.65rem', background: 'var(--red-bg)', color: 'var(--red)', fontWeight: 700 }}>🔴 LLENO</span>}
+                    {pct !== null && pct >= 80 && pct < 100 && <span style={{ padding: '0.1rem 0.4rem', borderRadius: '99px', fontSize: '0.65rem', background: 'var(--amber-bg)', color: 'var(--amber)', fontWeight: 700 }}>🟡 Casi lleno</span>}
+                  </div>
                   {a.ubicacion && <div style={{ fontSize: '0.78rem', color: 'var(--text-dim)', marginBottom: '0.75rem' }}>📍 {a.ubicacion}</div>}
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
                     <span style={{ fontSize: '0.8rem', color: 'var(--text-soft)' }}>Stock actual:</span>
                     <span style={{ fontWeight: 700, color: 'var(--primary)', fontSize: '0.9rem' }}>{a.stock_actual.toLocaleString('es-CO')} kg</span>
                   </div>
-                  {a.capacidad_kg && (
+                  {a.capacidad_kg && a.capacidad_kg > 0 && (
                     <>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
                         <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Capacidad:</span>
                         <span style={{ fontSize: '0.78rem', color: 'var(--text-dim)' }}>{a.capacidad_kg.toLocaleString('es-CO')} kg</span>
                       </div>
-                      <div style={{ background: 'var(--bg)', borderRadius: '99px', height: 8, overflow: 'hidden' }}>
-                        <div style={{ height: '100%', width: `${pct}%`, background: barColor, borderRadius: '99px', transition: 'width 0.5s' }} />
+                      <div style={{ background: 'var(--bg)', borderRadius: '99px', height: 8, overflow: 'hidden', marginBottom: '0.3rem' }}>
+                        <div style={{ height: '100%', width: `${Math.min(100, pct ?? 0)}%`, background: barColor, borderRadius: '99px', transition: 'width 0.5s' }} />
                       </div>
-                      <div style={{ fontSize: '0.7rem', color: barColor, fontWeight: 700, marginTop: '0.25rem', textAlign: 'right' }}>{pct}% ocupado</div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', marginBottom: '0.6rem' }}>
+                        <span style={{ color: barColor, fontWeight: 700 }}>{pct}% ocupado</span>
+                        <span style={{ color: 'var(--text-dim)' }}>{(a.espacio_disponible ?? 0).toLocaleString('es-CO')} kg libres</span>
+                      </div>
                     </>
+                  )}
+
+                  {/* Botón ver contenido */}
+                  <button onClick={() => verContenidoAlmacen(a.idalmacen)} style={{
+                    width: '100%', padding: '0.4rem', border: '1px solid var(--border)', borderRadius: 'var(--r-md)',
+                    background: isExpanded ? 'var(--bg)' : 'transparent', color: 'var(--text-soft)', fontWeight: 600,
+                    fontSize: '0.78rem', cursor: 'pointer', transition: 'all var(--t)',
+                  }}>
+                    {isExpanded ? '▲ Ocultar contenido' : '📦 Ver lotes dentro'}
+                  </button>
+
+                  {/* Contenido expandido */}
+                  {isExpanded && (
+                    <div style={{ marginTop: '0.6rem', borderTop: '1px solid var(--border-soft)', paddingTop: '0.6rem' }}>
+                      {loadingContenido ? (
+                        <div style={{ fontSize: '0.78rem', color: 'var(--text-dim)', textAlign: 'center', padding: '0.5rem' }}>Cargando…</div>
+                      ) : contenidoAlmacen.data.length === 0 ? (
+                        <div style={{ fontSize: '0.78rem', color: 'var(--text-dim)', textAlign: 'center', padding: '0.5rem' }}>📭 Vacío</div>
+                      ) : (
+                        contenidoAlmacen.data.map(c => (
+                          <div key={c.idlote_cafe} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', padding: '0.3rem 0', borderBottom: '1px solid var(--border-soft)' }}>
+                            <span style={{ color: 'var(--text-soft)' }}>☕ {c.variedad} <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>#{c.idlote_cafe}</span></span>
+                            <span style={{ fontWeight: 600, color: 'var(--primary)' }}>{c.kg_en_almacen.toLocaleString('es-CO')} kg</span>
+                          </div>
+                        ))
+                      )}
+                    </div>
                   )}
                 </div>
               )
@@ -265,13 +355,13 @@ export default function PortalTransportista({ usuario }: { usuario: UsuarioPorta
           </div>
         )
       ) : (
-        /* Formulario */
+        /* Formulario con validación de capacidad */
         <div style={{ maxWidth: 520 }}>
           {exitoMsg && <div style={{ background: 'var(--green-bg)', color: 'var(--green)', border: '1px solid var(--green)', borderRadius: 'var(--r-md)', padding: '0.75rem 1rem', marginBottom: '1rem', fontWeight: 600 }}>{exitoMsg}</div>}
           {errorForm && <div className="alert alert-error" style={{ marginBottom: '1rem' }}>⚠ {errorForm}</div>}
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            {/* Tipo de movimiento con botones visuales */}
+            {/* Tipo de movimiento */}
             <div>
               <label style={lblS}>Tipo de movimiento *</label>
               <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -308,7 +398,7 @@ export default function PortalTransportista({ usuario }: { usuario: UsuarioPorta
                   <label style={lblS}>Almacén origen {form.tipo === 'traslado' ? '*' : ''}</label>
                   <select style={selS} value={form.idalmacen_origen} onChange={e => setForm(p => ({ ...p, idalmacen_origen: e.target.value }))}>
                     <option value="">— Ninguno —</option>
-                    {almacenes.map(a => <option key={a.idalmacen} value={a.idalmacen}>{a.nombre} ({a.stock_actual} kg)</option>)}
+                    {almacenes.map(a => <option key={a.idalmacen} value={a.idalmacen}>{almacenLabel(a)}</option>)}
                   </select>
                 </div>
               )}
@@ -317,15 +407,36 @@ export default function PortalTransportista({ usuario }: { usuario: UsuarioPorta
                   <label style={lblS}>Almacén destino {form.tipo === 'traslado' ? '*' : ''}</label>
                   <select style={selS} value={form.idalmacen_destino} onChange={e => setForm(p => ({ ...p, idalmacen_destino: e.target.value }))}>
                     <option value="">— Ninguno —</option>
-                    {almacenes.map(a => <option key={a.idalmacen} value={a.idalmacen}>{a.nombre} ({a.stock_actual} kg)</option>)}
+                    {almacenes.map(a => {
+                      const lleno = a.capacidad_kg && a.capacidad_kg > 0 && (a.espacio_disponible ?? 0) <= 0
+                      return (
+                        <option key={a.idalmacen} value={a.idalmacen} disabled={!!lleno}>
+                          {lleno ? '🔴 ' : ''}{almacenLabel(a)}{lleno ? ' — LLENO' : ''}
+                        </option>
+                      )
+                    })}
                   </select>
+                  {/* Warning */}
+                  {form.idalmacen_destino && (() => {
+                    const dest = almacenes.find(a => a.idalmacen === Number(form.idalmacen_destino))
+                    if (!dest || !dest.capacidad_kg || dest.capacidad_kg <= 0) return null
+                    const pct = Math.round((dest.stock_actual / dest.capacidad_kg) * 100)
+                    if (pct >= 80) {
+                      return <p style={{ fontSize: '0.74rem', color: pct >= 95 ? 'var(--red)' : 'var(--amber)', marginTop: '0.3rem', fontWeight: 600 }}>
+                        ⚠️ {pct}% ocupado — {(dest.espacio_disponible ?? 0).toLocaleString('es-CO')} kg libres
+                      </p>
+                    }
+                    return <p style={{ fontSize: '0.74rem', color: 'var(--green)', marginTop: '0.3rem' }}>
+                      ✅ {(dest.espacio_disponible ?? 0).toLocaleString('es-CO')} kg disponibles
+                    </p>
+                  })()}
                 </div>
               )}
             </div>
 
             <div>
               <label style={lblS}>Notas / Observaciones</label>
-              <textarea style={{ ...inpS, resize: 'vertical', minHeight: 75 } as any} value={form.notas} onChange={e => setForm(p => ({ ...p, notas: e.target.value }))} placeholder="Condiciones del café, incidentes, placa vehículo, temperatura, etc." />
+              <textarea style={{ ...inpS, resize: 'vertical', minHeight: 75 } as any} value={form.notas} onChange={e => setForm(p => ({ ...p, notas: e.target.value }))} placeholder="Condiciones del café, placa vehículo, temperatura, etc." />
             </div>
           </div>
 
