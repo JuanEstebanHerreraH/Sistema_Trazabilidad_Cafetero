@@ -10,19 +10,19 @@ interface Column {
 }
 
 interface Field {
-  key: string
-  label: string
+  key?: string          // opcional: ausente en separadores de sección
+  section?: string      // separador visual (no se envía a BD)
+  label?: string
   type?: string
   required?: boolean
   placeholder?: string
-  description?: string   // ← texto de ayuda debajo del campo
+  description?: string
   options?: { value: any; label: string }[]
   default?: any
   step?: string
   min?: string
   max?: string
-  colSpan?: 'full' | 'half'  // ← control de columnas en formulario
-  section?: string           // ← título de sección (separador visual)
+  colSpan?: 'full' | 'half'
 }
 
 interface CrudPageProps {
@@ -54,6 +54,9 @@ export default function CrudPage({
   const [deleteId, setDeleteId]     = useState<any>(null)
   const [deleting, setDeleting]     = useState(false)
 
+  // ⚠️ Solo campos reales (excluir separadores de sección que no tienen key)
+  const dataFields = useMemo(() => fields.filter(f => !!f.key), [fields])
+
   const filtered = useMemo(() => {
     if (!search || !searchKey) return data
     const q = search.toLowerCase()
@@ -62,7 +65,7 @@ export default function CrudPage({
 
   const openCreate = () => {
     const defaults: Record<string, any> = {}
-    fields.forEach(f => { defaults[f.key] = f.default ?? '' })
+    dataFields.forEach(f => { defaults[f.key!] = f.default ?? '' })
     setForm(defaults)
     setEditRecord(null)
     setFormError(null)
@@ -71,7 +74,7 @@ export default function CrudPage({
 
   const openEdit = (record: any) => {
     const copy: Record<string, any> = {}
-    fields.forEach(f => { copy[f.key] = record[f.key] ?? '' })
+    dataFields.forEach(f => { copy[f.key!] = record[f.key!] ?? '' })
     setForm(copy)
     setEditRecord(record)
     setFormError(null)
@@ -86,11 +89,16 @@ export default function CrudPage({
     setFormError(null)
     try {
       const payload: Record<string, any> = {}
-      fields.forEach(f => {
-        const val = form[f.key]
-        if (val === '' && !f.required) payload[f.key] = null
-        else if (f.type === 'number') payload[f.key] = val === '' ? null : Number(val)
-        else payload[f.key] = val
+      // Solo itera campos reales con key definida
+      dataFields.forEach(f => {
+        const val = form[f.key!]
+        if (val === '' || val === null || val === undefined) {
+          payload[f.key!] = f.required ? val : null
+        } else if (f.type === 'number') {
+          payload[f.key!] = Number(val)
+        } else {
+          payload[f.key!] = val
+        }
       })
       if (editRecord) await update(editRecord[idField], payload)
       else await insert(payload)
@@ -114,7 +122,6 @@ export default function CrudPage({
     }
   }
 
-  // Agrupa campos para el layout del formulario
   const renderField = (field: Field) => (
     <div className="form-group" key={field.key} style={field.colSpan === 'full' ? { gridColumn: '1 / -1' } : {}}>
       <label className="form-label">
@@ -123,7 +130,7 @@ export default function CrudPage({
       </label>
 
       {field.type === 'select' ? (
-        <select className="form-select" value={form[field.key] ?? ''} onChange={e => handleChange(field.key, e.target.value)}>
+        <select className="form-select" value={form[field.key!] ?? ''} onChange={e => handleChange(field.key!, e.target.value)}>
           <option value="">— Selecciona —</option>
           {(field.options ?? []).map(opt => (
             <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -132,17 +139,16 @@ export default function CrudPage({
       ) : field.type === 'textarea' ? (
         <textarea
           className="form-textarea"
-          value={form[field.key] ?? ''}
-          onChange={e => handleChange(field.key, e.target.value)}
+          value={form[field.key!] ?? ''}
+          onChange={e => handleChange(field.key!, e.target.value)}
           placeholder={field.placeholder ?? ''}
-          required={field.required}
         />
       ) : (
         <input
           className="form-input"
           type={field.type ?? 'text'}
-          value={form[field.key] ?? ''}
-          onChange={e => handleChange(field.key, e.target.value)}
+          value={form[field.key!] ?? ''}
+          onChange={e => handleChange(field.key!, e.target.value)}
           placeholder={field.placeholder ?? ''}
           required={field.required}
           step={field.type === 'number' ? (field.step ?? 'any') : undefined}
@@ -176,7 +182,7 @@ export default function CrudPage({
         {searchKey && (
           <div className="toolbar-search">
             <span className="search-icon">🔍</span>
-            <input type="text" placeholder={`Buscar…`} value={search} onChange={e => setSearch(e.target.value)} />
+            <input type="text" placeholder="Buscar…" value={search} onChange={e => setSearch(e.target.value)} />
           </div>
         )}
         <span className="toolbar-count">{filtered.length} registro{filtered.length !== 1 ? 's' : ''}</span>
@@ -189,7 +195,7 @@ export default function CrudPage({
         <div className="empty-state">
           <div className="empty-icon">{icon}</div>
           <p>No hay registros{search ? ' que coincidan' : ''}.</p>
-          {!search && <small>Haz clic en "+ Nuevo" para agregar el primero.</small>}
+          {!search && <small>Haz clic en &quot;+ Nuevo&quot; para agregar el primero.</small>}
         </div>
       ) : (
         <div className="data-table-wrap">
@@ -238,10 +244,11 @@ export default function CrudPage({
         {formError && <div className="alert alert-error" style={{ marginBottom: '1rem' }}>⚠ {formError}</div>}
 
         <div className="form-grid-2">
-          {fields.map(field => {
+          {fields.map((field, idx) => {
+            // Separador de sección (sin key)
             if (field.section) {
               return (
-                <div key={`section-${field.section}`} style={{ gridColumn: '1 / -1' }}>
+                <div key={`section-${idx}`} style={{ gridColumn: '1 / -1' }}>
                   <div className="form-section-title">{field.section}</div>
                 </div>
               )
@@ -266,10 +273,7 @@ export default function CrudPage({
         }
       >
         <p style={{ color: 'var(--text-soft)', fontSize: '0.92rem', lineHeight: 1.6 }}>
-          ¿Estás seguro de que deseas eliminar este registro?
-        </p>
-        <p style={{ color: 'var(--text-dim)', fontSize: '0.8rem', marginTop: '0.4rem' }}>
-          Esta acción es irreversible y no se puede deshacer.
+          ¿Estás seguro de que deseas eliminar este registro? Esta acción no se puede deshacer.
         </p>
       </Modal>
     </div>
