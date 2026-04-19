@@ -109,7 +109,8 @@ END;
 $$;
 
 -- ── 7. VISTA: Almacenes con stock ───────────────────────────────────────────
-CREATE OR REPLACE VIEW public.v_almacen_stock AS
+DROP VIEW IF EXISTS public.v_almacen_stock CASCADE;
+CREATE VIEW public.v_almacen_stock AS
 SELECT
   a.idalmacen, a.nombre, a.ubicacion, a.capacidad_kg,
   public.fn_stock_almacen(a.idalmacen) AS stock_actual,
@@ -121,7 +122,8 @@ SELECT
 FROM public.almacen a;
 
 -- ── 8. VISTA: Ventas completas ──────────────────────────────────────────────
-CREATE OR REPLACE VIEW public.v_venta_completa AS
+DROP VIEW IF EXISTS public.v_venta_completa CASCADE;
+CREATE VIEW public.v_venta_completa AS
 SELECT
   v.idventa, v.fecha_venta,
   c.nombre AS cliente_nombre,
