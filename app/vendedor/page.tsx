@@ -55,19 +55,22 @@ function PortalVendedor({ usuario, onLogout }: { usuario: UsuarioPortal; onLogou
 
   const cargar = useCallback(async () => {
     setLoading(true)
-    const [{ data: v }, { data: l }, { data: c }] = await Promise.all([
+    const [ventasRes, lotesRes, clientesRes] = await Promise.all([
       supabase.from('venta').select(`
         idventa, fecha_venta, total_kg, precio_kg, notas,
         cliente(nombre, email, telefono),
-        detalle_venta(cantidad, precio_venta, lote_cafe:idlote_cafe(variedad))
+        detalle_venta(cantidad, precio_venta, lote_cafe(variedad))
       `).order('fecha_venta', { ascending: false }).limit(80),
-      supabase.from('lote_cafe').select('idlote_cafe, variedad, peso_kg, estado, precio_kg, finca:idfinca(nombre)')
+      supabase.from('lote_cafe').select('idlote_cafe, variedad, peso_kg, estado, precio_kg, finca(nombre)')
         .eq('estado', 'disponible').order('created_at', { ascending: false }),
       supabase.from('cliente').select('idcliente, nombre, email, telefono, created_at').order('nombre'),
     ])
-    setVentas(v ?? [])
-    setLotes(l ?? [])
-    setClientes(c ?? [])
+    if (ventasRes.error) console.error('[Vendedor] Error ventas:', ventasRes.error)
+    if (lotesRes.error) console.error('[Vendedor] Error lotes:', lotesRes.error)
+    if (clientesRes.error) console.error('[Vendedor] Error clientes:', clientesRes.error)
+    setVentas(ventasRes.data ?? [])
+    setLotes(lotesRes.data ?? [])
+    setClientes(clientesRes.data ?? [])
     setLoading(false)
   }, [supabase])
 

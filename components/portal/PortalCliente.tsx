@@ -81,7 +81,7 @@ export default function PortalCliente({ usuario }: { usuario: UsuarioPortal }) {
         ? supabase.from('venta').select(`
             idventa, fecha_venta, total_kg, precio_kg, notas,
             detalle_venta(iddetalle_venta, cantidad, precio_venta,
-              lote_cafe:idlote_cafe(variedad, finca:idfinca(nombre)))
+              lote_cafe(variedad, finca(nombre)))
           `).eq('idcliente', clienteId).order('fecha_venta', { ascending: false })
         : Promise.resolve({ data: [], error: null }),
     ])
@@ -92,7 +92,10 @@ export default function PortalCliente({ usuario }: { usuario: UsuarioPortal }) {
     } else {
       setErrorLotes(null)
     }
-    if (ventasRes.error) console.warn('[PortalCliente] Error cargando ventas:', ventasRes.error.message)
+    if (ventasRes.error) {
+      console.warn('[PortalCliente] Error cargando ventas:', ventasRes.error.message)
+      // Mostrar el error de ventas en consola para debug - no bloquear UI
+    }
 
     setLotes((lotesRes.data ?? []) as any)
     setVentas((ventasRes.data ?? []) as any)
