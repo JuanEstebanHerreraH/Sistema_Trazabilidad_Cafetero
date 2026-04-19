@@ -4,31 +4,6 @@ import { createClient } from '../utils/supabase/client'
 
 const supabase = createClient()
 
-// ── Hook de solo lectura ─────────────────────────────────────────────────────
-export function useRead(table: string, select = '*', orderBy?: string) {
-  const [data, setData] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    let cancelled = false
-    ;(async () => {
-      let q = supabase.from(table).select(select)
-      if (orderBy) q = (q as any).order(orderBy)
-      const { data: rows, error: err } = await q
-      if (!cancelled) {
-        if (err) setError(err.message)
-        else setData(rows ?? [])
-        setLoading(false)
-      }
-    })()
-    return () => { cancelled = true }
-  }, [table, select, orderBy])
-
-  return { data, loading, error }
-}
-
-// ── Hook CRUD completo ───────────────────────────────────────────────────────
 export function useCrud(
   table: string,
   idField: string,

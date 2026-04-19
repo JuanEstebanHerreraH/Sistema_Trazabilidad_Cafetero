@@ -3,208 +3,113 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '../../utils/supabase/client'
 
-// ── Tipos ────────────────────────────────────────────────────────────────────
 type Step = 'datos' | 'rol' | 'formulario' | 'exito'
 
-interface BaseForm {
-  nombre: string
-  email: string
-  password: string
-  confirmar: string
-  telefono: string
-}
-
-// Roles disponibles con configuración
 const ROLES = [
-  {
-    id: 'Cliente',
-    label: 'Cliente',
-    icon: '🤝',
-    desc: 'Comprador o consumidor de café',
-    autoAprobado: true,
-    color: 'var(--green)',
-  },
-  {
-    id: 'Productor',
-    label: 'Productor',
-    icon: '👨‍🌾',
-    desc: 'Dueño o administrador de finca cafetera',
-    autoAprobado: false,
-    color: 'var(--amber)',
-  },
-  {
-    id: 'Transportista',
-    label: 'Transportista',
-    icon: '🚛',
-    desc: 'Responsable del transporte de carga',
-    autoAprobado: false,
-    color: 'var(--blue)',
-  },
-  {
-    id: 'Catador',
-    label: 'Catador',
-    icon: '🔬',
-    desc: 'Evaluador de calidad del café',
-    autoAprobado: false,
-    color: 'var(--purple)',
-  },
+  { id: 'Cliente',      label: 'Cliente',      icon: '🤝', desc: 'Compra lotes de café directamente',     auto: true,  color: 'var(--green)' },
+  { id: 'Productor',    label: 'Productor',     icon: '👨‍🌾', desc: 'Dueño o administrador de finca',        auto: false, color: 'var(--amber)' },
+  { id: 'Operador',     label: 'Operador',      icon: '⚙️', desc: 'Gestión operativa y trazabilidad',      auto: false, color: 'var(--blue)'  },
+  { id: 'Vendedor',     label: 'Vendedor',      icon: '💼', desc: 'Gestión de ventas y clientes',          auto: false, color: 'var(--purple)'},
+  { id: 'Catador',      label: 'Catador',       icon: '🔬', desc: 'Evaluación de calidad del café',        auto: false, color: 'var(--teal)'  },
+  { id: 'Transportista',label: 'Transportista', icon: '🚛', desc: 'Responsable de transporte de carga',    auto: false, color: 'var(--primary)'},
 ]
 
-// Campos dinámicos por rol
-const CAMPOS_ROL: Record<string, { key: string; label: string; type?: string; placeholder?: string; required?: boolean }[]> = {
-  Productor: [
-    { key: 'nombre_finca',    label: 'Nombre de la finca',    required: true,  placeholder: 'Ej: Finca El Paraíso' },
-    { key: 'ubicacion',       label: 'Ubicación / Municipio', required: true,  placeholder: 'Ej: Huila, Colombia' },
-    { key: 'area_hectareas',  label: 'Área (hectáreas)',      type: 'number',  placeholder: 'Ej: 5.5' },
-    { key: 'certificaciones', label: 'Certificaciones',       placeholder: 'Ej: RainForest, UTZ, Orgánico' },
-    { key: 'variedad_cafe',   label: 'Variedades de café',    placeholder: 'Ej: Caturra, Colombia, Geisha' },
+const CAMPOS: Record<string, { key: string; label: string; type?: string; placeholder?: string; required?: boolean }[]> = {
+  Productor:     [
+    { key: 'nombre_finca',   label: 'Nombre de la finca',   required: true, placeholder: 'Finca El Paraíso' },
+    { key: 'ubicacion',      label: 'Ubicación / Municipio',required: true, placeholder: 'Huila, Colombia' },
+    { key: 'area_hectareas', label: 'Área (ha)',             type: 'number', placeholder: '5.5' },
+    { key: 'variedad_cafe',  label: 'Variedades',                            placeholder: 'Caturra, Geisha' },
+  ],
+  Operador: [
+    { key: 'cargo', label: 'Cargo', required: true, placeholder: 'Supervisor de operaciones' },
+    { key: 'area',  label: 'Área de responsabilidad', placeholder: 'Planta de beneficio' },
+  ],
+  Vendedor: [
+    { key: 'zona_ventas', label: 'Zona de ventas', required: true, placeholder: 'Región Andina' },
+    { key: 'experiencia', label: 'Años de experiencia', type: 'number', placeholder: '3' },
+  ],
+  Catador:  [
+    { key: 'certificaciones', label: 'Certificaciones', required: true, placeholder: 'Q Grader, SCA' },
+    { key: 'laboratorio',     label: 'Laboratorio',                      placeholder: 'CafeLab Colombia' },
   ],
   Transportista: [
-    { key: 'tipo_vehiculo',   label: 'Tipo de vehículo',      required: true,  placeholder: 'Ej: Camión, Furgón' },
-    { key: 'placa',           label: 'Placa',                 required: true,  placeholder: 'Ej: ABC-123' },
-    { key: 'numero_licencia', label: 'Número de licencia',    required: true,  placeholder: 'Licencia de conducción' },
-    { key: 'capacidad_kg',    label: 'Capacidad (kg)',        type: 'number',  placeholder: 'Ej: 5000' },
-    { key: 'zona_operacion',  label: 'Zona de operación',     placeholder: 'Ej: Eje Cafetero, Huila' },
-  ],
-  Catador: [
-    { key: 'anos_experiencia', label: 'Años de experiencia',  type: 'number',  placeholder: 'Ej: 5' },
-    { key: 'certificaciones',  label: 'Certificaciones',      required: true,  placeholder: 'Ej: Q Grader, SCA' },
-    { key: 'laboratorio',      label: 'Laboratorio / Empresa', placeholder: 'Nombre del laboratorio o empresa' },
-    { key: 'especialidad',     label: 'Especialidad',          placeholder: 'Ej: Cafés especiales, exportación' },
+    { key: 'placa',         label: 'Placa del vehículo', required: true, placeholder: 'ABC-123' },
+    { key: 'tipo_vehiculo', label: 'Tipo de vehículo',   required: true, placeholder: 'Camión, Furgón' },
   ],
 }
 
-// ── Componente principal ─────────────────────────────────────────────────────
 export default function RegisterPage() {
   const supabase = createClient()
-
-  const [step, setStep]           = useState<Step>('datos')
-  const [loading, setLoading]     = useState(false)
-  const [error, setError]         = useState<string | null>(null)
-
-  const [base, setBase] = useState<BaseForm>({
-    nombre: '', email: '', password: '', confirmar: '', telefono: '',
-  })
-
-  const [rolSeleccionado, setRolSeleccionado] = useState<string | null>(null)
+  const [step, setStep] = useState<Step>('datos')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [base, setBase] = useState({ nombre: '', email: '', password: '', confirmar: '', telefono: '' })
+  const [rolId, setRolId] = useState<string | null>(null)
   const [camposRol, setCamposRol] = useState<Record<string, string>>({})
 
-  // ── Validaciones ──────────────────────────────────────────────────────────
+  const rolInfo = ROLES.find(r => r.id === rolId)
 
-  const validarDatos = (): boolean => {
-    if (!base.nombre.trim()) { setError('El nombre es obligatorio.'); return false }
-    if (!base.email.trim())  { setError('El correo es obligatorio.'); return false }
-    if (!base.password)      { setError('La contraseña es obligatoria.'); return false }
-    if (base.password.length < 6) { setError('La contraseña debe tener al menos 6 caracteres.'); return false }
+  const validar = () => {
+    if (!base.nombre.trim()) { setError('Nombre obligatorio.'); return false }
+    if (!base.email.trim())  { setError('Correo obligatorio.'); return false }
+    if (base.password.length < 6) { setError('Contraseña mínimo 6 caracteres.'); return false }
     if (base.password !== base.confirmar) { setError('Las contraseñas no coinciden.'); return false }
     return true
   }
 
-  const irAlRol = () => {
-    setError(null)
-    if (validarDatos()) setStep('rol')
-  }
-
-  const irAlFormulario = () => {
-    setError(null)
-    if (!rolSeleccionado) { setError('Selecciona un rol para continuar.'); return }
-    const rolInfo = ROLES.find(r => r.id === rolSeleccionado)
-    if (rolInfo?.autoAprobado || !CAMPOS_ROL[rolSeleccionado!]) {
-      registrar()
-    } else {
-      setCamposRol({})
-      setStep('formulario')
-    }
-  }
-
-  // ── Registro final ────────────────────────────────────────────────────────
-
   const registrar = async () => {
-    setLoading(true)
-    setError(null)
+    setLoading(true); setError(null)
     try {
-      // 1. Crear usuario en Supabase Auth
       const { data: authData, error: authErr } = await supabase.auth.signUp({
-        email: base.email.trim(),
-        password: base.password,
-        options: {
-          data: { nombre: base.nombre.trim() },
-          // emailRedirectTo puede ajustarse según tu dominio
-        },
+        email: base.email.trim(), password: base.password,
+        options: { data: { nombre: base.nombre.trim() } },
       })
-
-      if (authErr) {
-        // Errores comunes traducidos
-        if (authErr.message.includes('already registered')) {
-          throw new Error('Este correo ya está registrado. Intenta iniciar sesión.')
-        }
-        throw new Error(authErr.message)
-      }
-
-      const authUid = authData.user?.id
-      const needsConfirmation = !authData.session // si no hay sesión, Supabase envió email de confirmación
-
-      // 2. Obtener id del rol desde la tabla pública
-      const { data: rolData } = await supabase
-        .from('rol')
-        .select('idrol')
-        .eq('nombre', rolSeleccionado)
-        .single()
-
+      if (authErr) throw new Error(
+        authErr.message.includes('already registered') ? 'Este correo ya está registrado.' : authErr.message
+      )
+      const { data: rolData } = await supabase.from('rol').select('idrol').eq('nombre', rolId).single()
       const idrol = rolData?.idrol ?? null
-      const rolInfo = ROLES.find(r => r.id === rolSeleccionado)
-      const estadoAprobacion = rolInfo?.autoAprobado ? 'aprobado' : 'pendiente'
-
-      // 3. Insertar en tabla usuario pública
-      const { data: usuarioData, error: userErr } = await supabase
-        .from('usuario')
-        .insert({
-          nombre:            base.nombre.trim(),
-          email:             base.email.trim(),
-          password_hash:     '—', // auth la maneja Supabase Auth
-          telefono:          base.telefono.trim() || null,
-          idrol:             rolInfo?.autoAprobado ? idrol : null,
-          rol_solicitado:    idrol,
-          estado_aprobacion: estadoAprobacion,
-          auth_uid:          authUid ?? null,
+      const estado = rolInfo?.auto ? 'aprobado' : 'pendiente'
+      const { data: usuarioData, error: uErr } = await supabase.from('usuario').insert({
+        nombre: base.nombre.trim(), email: base.email.trim(), password_hash: '—',
+        telefono: base.telefono.trim() || null,
+        idrol: rolInfo?.auto ? idrol : null,
+        rol_solicitado: idrol,
+        estado_aprobacion: estado,
+        auth_uid: authData.user?.id ?? null,
+      }).select('idusuario').single()
+      if (uErr) throw new Error(uErr.message)
+      if (!rolInfo?.auto && rolId && CAMPOS[rolId]) {
+        await supabase.from('solicitud_rol').insert({
+          idusuario: usuarioData.idusuario, tipo_rol: rolId,
+          datos_formulario: camposRol, estado_revision: 'pendiente',
         })
-        .select('idusuario')
-        .single()
-
-      if (userErr) throw new Error(userErr.message)
-
-      // 4. Insertar solicitud de rol si es rol especial
-      if (!rolInfo?.autoAprobado && rolSeleccionado && CAMPOS_ROL[rolSeleccionado]) {
-        await supabase
-          .from('solicitud_rol')
-          .insert({
-            idusuario:        usuarioData.idusuario,
-            tipo_rol:         rolSeleccionado,
-            datos_formulario: camposRol,
-            estado_revision:  'pendiente',
-          })
       }
-
       setStep('exito')
-    } catch (err: any) {
-      setError(err.message)
-    } finally {
-      setLoading(false)
-    }
+    } catch (err: any) { setError(err.message) }
+    finally { setLoading(false) }
   }
 
-  const handleCampoRol = (key: string, value: string) =>
-    setCamposRol(prev => ({ ...prev, [key]: value }))
+  const irSiguiente = () => {
+    setError(null)
+    if (step === 'datos') { if (validar()) setStep('rol') }
+    else if (step === 'rol') {
+      if (!rolId) { setError('Selecciona un rol.'); return }
+      if (rolInfo?.auto || !CAMPOS[rolId!]) registrar()
+      else { setCamposRol({}); setStep('formulario') }
+    }
+    else if (step === 'formulario') registrar()
+  }
 
-  // ── Render ────────────────────────────────────────────────────────────────
-  const rolActual = ROLES.find(r => r.id === rolSeleccionado)
+  const steps = ['datos', 'rol', 'formulario'] as const
+  const stepLabels = ['Datos', 'Rol', 'Detalles']
 
   return (
-    <div className="login-page">
-      <div className="login-card register-card">
-
-        <div className="login-header">
-          <div className="login-icon">☕</div>
+    <div className="auth-page">
+      <div className="auth-card register-card">
+        <div className="auth-logo">
+          <div className="auth-logo-mark">☕</div>
           <h1>Crear cuenta</h1>
           <p>Únete al sistema de trazabilidad</p>
         </div>
@@ -214,158 +119,123 @@ export default function RegisterPage() {
           <span className="auth-tab active">Registrarse</span>
         </div>
 
-        {/* Indicador de pasos */}
-        <div className="steps-indicator">
-          {(['datos', 'rol', 'formulario'] as Step[]).map((s, i) => {
-            const labels = ['Datos', 'Rol', 'Detalles']
-            const done = step === 'exito' ||
-              (step === 'formulario' && i < 2) ||
-              (step === 'rol' && i < 1)
-            const active = step === s
-            return (
-              <div key={s} className={`step-item ${active ? 'active' : ''} ${done ? 'done' : ''}`}>
-                <div className="step-circle">{done ? '✓' : i + 1}</div>
-                <span className="step-label">{labels[i]}</span>
-                {i < 2 && <div className={`step-line ${done ? 'done' : ''}`} />}
-              </div>
-            )
-          })}
-        </div>
-
-        {error && (
-          <div className="alert alert-error" style={{ marginBottom: '1rem' }}>⚠ {error}</div>
+        {step !== 'exito' && (
+          <div className="steps-indicator" style={{ marginBottom: '1.25rem' }}>
+            {steps.map((s, i) => {
+              const idx = steps.indexOf(step as any)
+              return (
+                <div key={s} className={`step-item${step === s ? ' active' : ''}${idx > i ? ' done' : ''}`}>
+                  <div className="step-circle">{idx > i ? '✓' : i + 1}</div>
+                  <span className="step-label" style={{ marginRight: '0.3rem' }}>{stepLabels[i]}</span>
+                  {i < 2 && <div className={`step-line${idx > i ? ' done' : ''}`} />}
+                </div>
+              )
+            })}
+          </div>
         )}
 
-        {/* ── PASO 1: Datos personales ── */}
+        {error && <div className="alert alert-error" style={{ marginBottom: '1rem' }}>⚠ {error}</div>}
+
         {step === 'datos' && (
-          <div className="register-step">
-            <div className="form-grid-2">
-              <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+          <div>
+            <div className="form-grid-2" style={{ marginBottom: '1rem' }}>
+              <div className="form-group" style={{ gridColumn: '1/-1' }}>
                 <label className="form-label">Nombre completo <span className="form-required">*</span></label>
                 <input className="form-input" type="text" value={base.nombre}
-                  onChange={e => setBase(p => ({ ...p, nombre: e.target.value }))}
-                  placeholder="Ej: Juan Esteban Herrera" autoComplete="name" />
+                  onChange={e => setBase(p => ({ ...p, nombre: e.target.value }))} placeholder="Juan Esteban Herrera" />
               </div>
-              <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-                <label className="form-label">Correo electrónico <span className="form-required">*</span></label>
+              <div className="form-group" style={{ gridColumn: '1/-1' }}>
+                <label className="form-label">Correo <span className="form-required">*</span></label>
                 <input className="form-input" type="email" value={base.email}
-                  onChange={e => setBase(p => ({ ...p, email: e.target.value }))}
-                  placeholder="tu@email.com" autoComplete="email" />
+                  onChange={e => setBase(p => ({ ...p, email: e.target.value }))} placeholder="tu@email.com" />
               </div>
               <div className="form-group">
                 <label className="form-label">Contraseña <span className="form-required">*</span></label>
                 <input className="form-input" type="password" value={base.password}
-                  onChange={e => setBase(p => ({ ...p, password: e.target.value }))}
-                  placeholder="Mínimo 6 caracteres" autoComplete="new-password" />
+                  onChange={e => setBase(p => ({ ...p, password: e.target.value }))} placeholder="Mínimo 6 caracteres" />
               </div>
               <div className="form-group">
                 <label className="form-label">Confirmar contraseña <span className="form-required">*</span></label>
                 <input className="form-input" type="password" value={base.confirmar}
-                  onChange={e => setBase(p => ({ ...p, confirmar: e.target.value }))}
-                  placeholder="Repite tu contraseña" autoComplete="new-password" />
+                  onChange={e => setBase(p => ({ ...p, confirmar: e.target.value }))} placeholder="Repite la contraseña" />
               </div>
-              <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-                <label className="form-label">Teléfono <span style={{ color: 'var(--text-dim)', fontWeight: 400 }}>(opcional)</span></label>
+              <div className="form-group" style={{ gridColumn: '1/-1' }}>
+                <label className="form-label">Teléfono <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(opcional)</span></label>
                 <input className="form-input" type="tel" value={base.telefono}
-                  onChange={e => setBase(p => ({ ...p, telefono: e.target.value }))}
-                  placeholder="+57 300 000 0000" />
+                  onChange={e => setBase(p => ({ ...p, telefono: e.target.value }))} placeholder="+57 300 000 0000" />
               </div>
             </div>
-            <button className="btn btn-primary"
-              style={{ width: '100%', justifyContent: 'center', marginTop: '0.5rem' }}
-              onClick={irAlRol}>
-              Continuar →
-            </button>
+            <button className="btn btn-primary" style={{ width: '100%', padding: '0.6rem' }} onClick={irSiguiente}>Continuar →</button>
           </div>
         )}
 
-        {/* ── PASO 2: Selección de rol ── */}
         {step === 'rol' && (
-          <div className="register-step">
-            <p className="register-step-desc">
-              Selecciona el rol con el que participarás en el sistema.
-              Los roles especiales requieren validación del administrador.
+          <div>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-dim)', marginBottom: '0.8rem' }}>
+              Selecciona tu rol en el sistema. Los roles especiales requieren aprobación del administrador.
             </p>
-            <div className="roles-grid">
-              {ROLES.map(rol => (
-                <button key={rol.id}
-                  className={`rol-card ${rolSeleccionado === rol.id ? 'selected' : ''}`}
-                  onClick={() => setRolSeleccionado(rol.id)}
-                  style={{ '--rol-color': rol.color } as any}>
-                  <div className="rol-card-icon">{rol.icon}</div>
-                  <div className="rol-card-nombre">{rol.label}</div>
-                  <div className="rol-card-desc">{rol.desc}</div>
-                  {rol.autoAprobado
-                    ? <span className="rol-badge-auto">✓ Aprobación automática</span>
-                    : <span className="rol-badge-revision">⏳ Requiere revisión</span>
-                  }
+            <div className="roles-grid" style={{ gridTemplateColumns: 'repeat(2,1fr)', marginBottom: '1rem' }}>
+              {ROLES.map(r => (
+                <button key={r.id} className={`rol-card${rolId === r.id ? ' selected' : ''}`}
+                  style={{ '--rol-color': r.color } as any} onClick={() => setRolId(r.id)}>
+                  <div className="rol-card-icon">{r.icon}</div>
+                  <div className="rol-card-nombre">{r.label}</div>
+                  <div className="rol-card-desc">{r.desc}</div>
+                  {r.auto
+                    ? <span className="rol-badge-auto">✓ Acceso inmediato</span>
+                    : <span className="rol-badge-revision">⏳ Requiere aprobación</span>}
                 </button>
               ))}
             </div>
             <div className="register-nav">
               <button className="btn btn-secondary" onClick={() => { setError(null); setStep('datos') }}>← Atrás</button>
-              <button className="btn btn-primary" onClick={irAlFormulario}
-                disabled={!rolSeleccionado || loading}>
-                {loading ? 'Registrando…' : (rolActual?.autoAprobado ? 'Registrarme' : 'Continuar →')}
+              <button className="btn btn-primary" onClick={irSiguiente} disabled={!rolId || loading}>
+                {loading ? '⏳ Registrando…' : rolInfo?.auto ? 'Registrarme' : 'Continuar →'}
               </button>
             </div>
           </div>
         )}
 
-        {/* ── PASO 3: Formulario específico del rol ── */}
-        {step === 'formulario' && rolSeleccionado && CAMPOS_ROL[rolSeleccionado] && (
-          <div className="register-step">
-            <div className="rol-info-banner" style={{ '--rol-color': rolActual?.color } as any}>
-              <span className="rol-info-icon">{rolActual?.icon}</span>
+        {step === 'formulario' && rolId && CAMPOS[rolId] && (
+          <div>
+            <div className="rol-info-banner" style={{ '--rol-color': rolInfo?.color } as any}>
+              <span className="rol-info-icon">{rolInfo?.icon}</span>
               <div>
-                <div className="rol-info-nombre">{rolActual?.label}</div>
-                <div className="rol-info-sub">Completa los datos adicionales para tu solicitud</div>
+                <div className="rol-info-nombre">{rolInfo?.label}</div>
+                <div className="rol-info-sub">Completa los datos para tu solicitud</div>
               </div>
             </div>
-            <div className="form-grid-2" style={{ marginTop: '1rem' }}>
-              {CAMPOS_ROL[rolSeleccionado].map(campo => (
-                <div key={campo.key} className="form-group"
-                  style={{ gridColumn: campo.type === 'number' ? undefined : '1 / -1' }}>
-                  <label className="form-label">
-                    {campo.label}
-                    {campo.required && <span className="form-required">*</span>}
-                  </label>
-                  <input className="form-input" type={campo.type ?? 'text'}
-                    value={camposRol[campo.key] ?? ''}
-                    onChange={e => handleCampoRol(campo.key, e.target.value)}
-                    placeholder={campo.placeholder ?? ''} />
+            <div className="form-grid-2" style={{ marginTop: '1rem', marginBottom: '1rem' }}>
+              {CAMPOS[rolId].map(c => (
+                <div key={c.key} className="form-group" style={{ gridColumn: c.type === 'number' ? undefined : '1/-1' }}>
+                  <label className="form-label">{c.label}{c.required && <span className="form-required">*</span>}</label>
+                  <input className="form-input" type={c.type ?? 'text'} value={camposRol[c.key] ?? ''}
+                    onChange={e => setCamposRol(p => ({ ...p, [c.key]: e.target.value }))} placeholder={c.placeholder ?? ''} />
                 </div>
               ))}
             </div>
             <div className="register-nav">
               <button className="btn btn-secondary" onClick={() => { setError(null); setStep('rol') }}>← Atrás</button>
-              <button className="btn btn-primary" onClick={registrar} disabled={loading}>
-                {loading ? 'Enviando…' : 'Enviar solicitud'}
+              <button className="btn btn-primary" onClick={irSiguiente} disabled={loading}>
+                {loading ? '⏳ Enviando…' : 'Enviar solicitud'}
               </button>
             </div>
           </div>
         )}
 
-        {/* ── ÉXITO ── */}
         {step === 'exito' && (
           <div className="register-exito">
-            <div className="exito-icon">{rolActual?.autoAprobado ? '✅' : '⏳'}</div>
-            <h2>{rolActual?.autoAprobado ? '¡Bienvenido!' : 'Solicitud enviada'}</h2>
+            <div className="exito-icon">{rolInfo?.auto ? '✅' : '⏳'}</div>
+            <h2>{rolInfo?.auto ? '¡Bienvenido!' : 'Solicitud enviada'}</h2>
             <p>
-              {rolActual?.autoAprobado
-                ? 'Tu cuenta fue creada. Si recibes un correo de confirmación, verifica tu bandeja de entrada antes de iniciar sesión.'
-                : `Tu solicitud como ${rolSeleccionado} fue enviada. Un administrador la revisará pronto. Es posible que necesites confirmar tu correo electrónico primero.`
-              }
+              {rolInfo?.auto
+                ? 'Tu cuenta está lista. Si necesitas confirmar tu correo, revisa tu bandeja de entrada.'
+                : `Tu solicitud como ${rolId} fue enviada. El administrador la revisará pronto.`}
             </p>
-            <div className="exito-tip">
-              💡 Si no puedes iniciar sesión, revisa tu bandeja de entrada (o spam) para confirmar tu correo electrónico.
-            </div>
-            <Link href="/login" className="btn btn-primary" style={{ marginTop: '0.5rem' }}>
-              Ir al inicio de sesión
-            </Link>
+            <div className="exito-tip">💡 Si no puedes ingresar, revisa tu bandeja de entrada para confirmar el correo.</div>
+            <Link href="/login" className="btn btn-primary" style={{ marginTop: '0.5rem' }}>Ir al inicio de sesión</Link>
           </div>
         )}
-
       </div>
     </div>
   )

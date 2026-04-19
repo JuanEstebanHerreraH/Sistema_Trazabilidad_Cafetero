@@ -1,183 +1,133 @@
 'use client'
-
-interface UsuarioPortal { idusuario: number; nombre: string; email: string; estado_aprobacion: string }
-
 import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '../../utils/supabase/client'
 
+interface UsuarioPortal { idusuario: number; nombre: string; email: string }
+
 interface Lote {
-  idlote_cafe: number
-  variedad: string
-  fecha_cosecha: string
-  peso_kg: number
-  estado: string
-  precio_kg: number   // precio fijado por el admin — NO editable por el cliente
+  idlote_cafe: number; variedad: string; fecha_cosecha: string
+  peso_kg: number; estado: string; precio_kg: number
   finca: { nombre: string; ubicacion: string | null; productor: { nombre: string } | null } | null
   registro_proceso: { proceso: { nombre: string } | null }[]
 }
 
-interface LineaCompra {
-  lote: Lote
-  cantidad: number
-}
+interface LineaCarrito { lote: Lote; cantidad: number }
 
 interface VentaHistorial {
-  idventa: number
-  fecha_venta: string
-  total_kg: number | null
-  precio_kg: number | null
-  notas: string | null
-  detalle_venta: {
-    iddetalle_venta: number
-    cantidad: number
-    precio_venta: number
-    lote_cafe: { variedad: string; finca: { nombre: string } | null } | null
-  }[]
+  idventa: number; fecha_venta: string; total_kg: number | null; precio_kg: number | null; notas: string | null
+  detalle_venta: { iddetalle_venta: number; cantidad: number; precio_venta: number; lote_cafe: { variedad: string; finca: { nombre: string } | null } | null }[]
 }
 
 export default function PortalCliente({ usuario }: { usuario: UsuarioPortal }) {
   const supabase = createClient()
-  const [lotes, setLotes]         = useState<Lote[]>([])
-  const [ventas, setVentas]       = useState<VentaHistorial[]>([])
+  const [lotes, setLotes] = useState<Lote[]>([])
+  const [ventas, setVentas] = useState<VentaHistorial[]>([])
   const [idCliente, setIdCliente] = useState<number | null>(null)
-  const [tab, setTab]             = useState<'catalogo' | 'carrito' | 'compras'>('catalogo')
-  const [loading, setLoading]     = useState(true)
-  const [filtro, setFiltro]       = useState('')
-  const [carrito, setCarrito]     = useState<LineaCompra[]>([])
+  const [tab, setTab] = useState<'catalogo' | 'carrito' | 'compras'>('catalogo')
+  const [loading, setLoading] = useState(true)
+  const [filtro, setFiltro] = useState('')
+  const [carrito, setCarrito] = useState<LineaCarrito[]>([])
   const [comprando, setComprando] = useState(false)
   const [errorCompra, setErrorCompra] = useState<string | null>(null)
-  const [exitoMsg, setExitoMsg]   = useState<string | null>(null)
+  const [exitoMsg, setExitoMsg] = useState<string | null>(null)
 
   const cargar = useCallback(async () => {
-    // 1. Buscar cliente por email O por nombre (para cubrir registros creados desde admin)
+    // 1. Buscar o crear cliente vinculado al usuario
     let { data: clienteRows } = await supabase
       .from('cliente').select('idcliente, email, nombre')
       .or(`email.eq.${usuario.email},nombre.eq.${usuario.nombre}`)
 
-    let clienteRow = clienteRows?.find(c => c.email === usuario.email)
-      ?? clienteRows?.[0]
-      ?? null
+    let clienteRow = clienteRows?.find(c => c.email === usuario.email) ?? clienteRows?.[0] ?? null
 
     if (!clienteRow) {
-      const { data: nuevo } = await supabase
-        .from('cliente').insert({ nombre: usuario.nombre, email: usuario.email })
+      const { data: nuevo } = await supabase.from('cliente')
+        .insert({ nombre: usuario.nombre, email: usuario.email })
         .select('idcliente').single()
       clienteRow = nuevo as any
     } else if (!clienteRow.email) {
-      // Si existe pero sin email, vincular
       await supabase.from('cliente').update({ email: usuario.email }).eq('idcliente', clienteRow.idcliente)
     }
 
     const mainId = clienteRow?.idcliente ?? null
     setIdCliente(mainId)
-
-    // Recopilar TODOS los IDs de cliente que podrían tener ventas de este usuario
-    const allClienteIds = [...new Set((clienteRows ?? []).map(c => c.idcliente).filter(Boolean))]
-    if (mainId && !allClienteIds.includes(mainId)) allClienteIds.push(mainId)
+    const allIds = [...new Set((clienteRows ?? []).map(c => c.idcliente).concat(mainId ? [mainId] : []).filter(Boolean))]
 
     const [{ data: l }, { data: v }] = await Promise.all([
-      supabase
-        .from('lote_cafe')
-        .select(`
-          idlote_cafe, variedad, fecha_cosecha, peso_kg, estado, precio_kg,
-          finca(nombre, ubicacion, productor(nombre)),
-          registro_proceso(proceso(nombre))
-        `)
-        .eq('estado', 'disponible')
-        .gt('peso_kg', 0)
-        .order('fecha_cosecha', { ascending: false }),
+      supabase.from('lote_cafe').select(`
+        idlote_cafe, variedad, fecha_cosecha, peso_kg, estado, precio_kg,
+        finca(nombre, ubicacion, productor(nombre)),
+        registro_proceso(proceso(nombre))
+      `).eq('estado', 'disponible').gt('peso_kg', 0).order('fecha_cosecha', { ascending: false }),
 
-      allClienteIds.length > 0
-        ? supabase
-            .from('venta')
-            .select(`idventa, fecha_venta, total_kg, precio_kg, notas,
-              detalle_venta(iddetalle_venta, cantidad, precio_venta,
-                lote_cafe(variedad, finca(nombre)))`)
-            .in('idcliente', allClienteIds)
-            .order('fecha_venta', { ascending: false })
+      allIds.length > 0
+        ? supabase.from('venta').select(`
+            idventa, fecha_venta, total_kg, precio_kg, notas,
+            detalle_venta(iddetalle_venta, cantidad, precio_venta,
+              lote_cafe:idlote_cafe(variedad, finca:idfinca(nombre)))
+          `).in('idcliente', allIds).order('fecha_venta', { ascending: false })
         : Promise.resolve({ data: [] }),
     ])
 
     setLotes((l ?? []) as any)
     setVentas((v ?? []) as any)
     setLoading(false)
-  }, [usuario.email, usuario.nombre])
+  }, [usuario.email, usuario.nombre, supabase])
 
   useEffect(() => { cargar() }, [cargar])
 
-  const agregarAlCarrito = (lote: Lote, cantidad: number) => {
+  const agregarCarrito = (lote: Lote, cantidad: number) => {
     setCarrito(prev => {
-      const existe = prev.find(l => l.lote.idlote_cafe === lote.idlote_cafe)
-      if (existe) return prev.map(l => l.lote.idlote_cafe === lote.idlote_cafe ? { ...l, cantidad } : l)
+      const ex = prev.find(l => l.lote.idlote_cafe === lote.idlote_cafe)
+      if (ex) return prev.map(l => l.lote.idlote_cafe === lote.idlote_cafe ? { ...l, cantidad } : l)
       return [...prev, { lote, cantidad }]
     })
   }
 
-  const quitarDelCarrito = (idlote: number) =>
-    setCarrito(prev => prev.filter(l => l.lote.idlote_cafe !== idlote))
+  const quitarCarrito = (id: number) => setCarrito(prev => prev.filter(l => l.lote.idlote_cafe !== id))
 
-  // Confirmar compra — escribe en BD, el trigger descuenta stock automáticamente
   const confirmarCompra = async () => {
     if (!idCliente || carrito.length === 0) return
-    setComprando(true)
-    setErrorCompra(null)
+    setComprando(true); setErrorCompra(null)
     try {
-      // 0. Optimistic lock: re-verificar stock actual de cada lote
+      // Verificar stock actualizado antes de insertar
       for (const linea of carrito) {
-        const { data: loteActual } = await supabase
-          .from('lote_cafe')
-          .select('peso_kg, estado')
-          .eq('idlote_cafe', linea.lote.idlote_cafe)
-          .single()
-
-        if (!loteActual || loteActual.estado !== 'disponible') {
-          throw new Error(`El lote "${linea.lote.variedad}" ya no está disponible. Otro usuario pudo haberlo comprado. Recarga la página.`)
-        }
-        if (loteActual.peso_kg < linea.cantidad) {
-          throw new Error(`El lote "${linea.lote.variedad}" solo tiene ${loteActual.peso_kg} kg disponibles (pediste ${linea.cantidad} kg). El stock cambió desde que lo agregaste al carrito.`)
-        }
+        const { data: actual } = await supabase.from('lote_cafe')
+          .select('peso_kg, estado').eq('idlote_cafe', linea.lote.idlote_cafe).single()
+        if (!actual || actual.estado !== 'disponible')
+          throw new Error(`Lote "${linea.lote.variedad}" ya no está disponible.`)
+        if (actual.peso_kg < linea.cantidad)
+          throw new Error(`Lote "${linea.lote.variedad}" solo tiene ${actual.peso_kg} kg disponibles (pediste ${linea.cantidad} kg).`)
       }
 
-      const totalKg    = carrito.reduce((s, l) => s + l.cantidad, 0)
-      const precioBase = carrito[0].lote.precio_kg  // precio del lote, no editable
+      const totalKg = carrito.reduce((s, l) => s + l.cantidad, 0)
 
-      // 1. Crear la venta (cabecera)
-      const { data: ventaData, error: ventaErr } = await supabase
-        .from('venta')
-        .insert({
-          fecha_venta: new Date().toISOString(),
-          idcliente:   idCliente,
-          total_kg:    totalKg,
-          precio_kg:   precioBase,
-          notas: `Compra portal cliente — ${carrito.map(l => l.lote.variedad).join(', ')}`,
-        })
-        .select('idventa').single()
-      if (ventaErr) throw new Error(ventaErr.message)
+      // 1. Crear venta cabecera
+      const { data: ventaData, error: vErr } = await supabase.from('venta').insert({
+        fecha_venta: new Date().toISOString(),
+        idcliente: idCliente,
+        total_kg: totalKg,
+        precio_kg: carrito[0].lote.precio_kg,
+        notas: `Compra portal cliente — ${carrito.map(l => l.lote.variedad).join(', ')}`,
+      }).select('idventa').single()
+      if (vErr) throw new Error(vErr.message)
 
-      // 2. Insertar detalle_venta por cada lote
-      //    El trigger trg_descontar_stock_venta descuenta peso_kg automáticamente
-      //    El trigger trg_actualizar_total_venta actualiza totales de la venta
-      const { error: detErr } = await supabase.from('detalle_venta').insert(
+      // 2. Insertar detalles — el trigger descuenta el stock automáticamente
+      const { error: dErr } = await supabase.from('detalle_venta').insert(
         carrito.map(l => ({
-          idventa:      ventaData.idventa,
-          idlote_cafe:  l.lote.idlote_cafe,
-          cantidad:     l.cantidad,
+          idventa: ventaData.idventa,
+          idlote_cafe: l.lote.idlote_cafe,
+          cantidad: l.cantidad,
           precio_venta: l.lote.precio_kg,
         }))
       )
-      if (detErr) throw new Error(detErr.message)
-
-      // (No necesitamos actualizar lote_cafe manualmente — el trigger lo hace)
+      if (dErr) throw new Error(dErr.message)
 
       setCarrito([])
-      setExitoMsg(`✅ Compra #${ventaData.idventa} registrada (${totalKg} kg por $${(totalKg * precioBase).toLocaleString('es-CO')}). Stock actualizado automáticamente en toda la plataforma — admin, productores y transportistas ven los cambios al instante.`)
+      setExitoMsg(`✅ Compra #${ventaData.idventa} registrada — ${totalKg} kg por $${(totalKg * carrito[0].lote.precio_kg).toLocaleString('es-CO')} COP`)
       setTimeout(() => { setExitoMsg(null); setTab('compras') }, 3500)
       await cargar()
-    } catch (err: any) {
-      setErrorCompra(err.message)
-    } finally {
-      setComprando(false)
-    }
+    } catch (e: any) { setErrorCompra(e.message) }
+    finally { setComprando(false) }
   }
 
   const lotesFiltrados = lotes.filter(l =>
@@ -194,186 +144,141 @@ export default function PortalCliente({ usuario }: { usuario: UsuarioPortal }) {
   return (
     <div>
       <div style={{ marginBottom: '1.5rem' }}>
-        <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.6rem', color: 'var(--text)', marginBottom: '0.25rem' }}>
-          🤝 Bienvenido, {usuario.nombre}
+        <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.6rem', color: 'var(--text)', marginBottom: '0.2rem' }}>
+          Bienvenido, {usuario.nombre}
         </h1>
-        <p style={{ color: 'var(--text-dim)', fontSize: '0.88rem' }}>
-          Compra lotes de café directamente. Cada compra descuenta el stock en tiempo real.
+        <p style={{ color: 'var(--text-dim)', fontSize: '0.84rem' }}>
+          Compra lotes de café directamente desde el portal. Stock actualizado en tiempo real.
         </p>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
+      {/* Stats */}
+      <div className="stats-grid" style={{ marginBottom: '1.5rem' }}>
         {[
-          { icon: '☕', label: 'Disponibles',     val: lotes.length,            color: 'var(--primary)' },
-          { icon: '🛒', label: 'En carrito',       val: carrito.length,          color: 'var(--amber)'   },
-          { icon: '📦', label: 'Mis compras',      val: ventas.length,           color: 'var(--green)'   },
-          { icon: '⚖️', label: 'Total adquirido', val: `${totalCompradoKg} kg`, color: 'var(--blue)'    },
+          { icon: '☕', label: 'Lotes disponibles', val: lotes.length,            color: 'var(--primary)', onClick: () => setTab('catalogo') },
+          { icon: '🛒', label: 'En carrito',        val: carrito.length,          color: 'var(--amber)',   onClick: () => carrito.length > 0 && setTab('carrito') },
+          { icon: '📦', label: 'Mis compras',       val: ventas.length,           color: 'var(--green)',   onClick: () => setTab('compras') },
+          { icon: '⚖️', label: 'Total adquirido',  val: `${totalCompradoKg} kg`, color: 'var(--blue)',    onClick: undefined },
         ].map(s => (
-          <div key={s.label}
-            style={{ background: 'var(--bg-card)', border: '1px solid var(--border-soft)', borderRadius: 'var(--r-lg)', padding: '0.9rem 1rem', cursor: s.label === 'En carrito' ? 'pointer' : 'default' }}
-            onClick={() => s.label === 'En carrito' && carrito.length > 0 && setTab('carrito')}>
-            <div style={{ fontSize: '1.3rem', marginBottom: '0.3rem' }}>{s.icon}</div>
-            <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', fontWeight: 700, color: s.color }}>{s.val}</div>
-            <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)', marginTop: '0.1rem' }}>{s.label}</div>
+          <div key={s.label} className="stat-card" style={{ '--accent': s.color, cursor: s.onClick ? 'pointer' : 'default' } as any}
+            onClick={s.onClick}>
+            <div className="stat-icon">{s.icon}</div>
+            <div className="stat-value">{s.val}</div>
+            <div className="stat-label">{s.label}</div>
           </div>
         ))}
       </div>
 
-      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.25rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.75rem' }}>
+      {/* Tabs */}
+      <div className="tabs">
         {([
           ['catalogo', `☕ Catálogo (${lotes.length})`],
           ['carrito',  `🛒 Carrito${carrito.length > 0 ? ` (${carrito.length})` : ''}`],
           ['compras',  `📦 Mis compras (${ventas.length})`],
         ] as const).map(([t, lbl]) => (
-          <button key={t} onClick={() => setTab(t)}
-            style={{ padding: '0.4rem 1rem', border: 'none', borderRadius: 'var(--r-md)', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer', background: tab === t ? 'var(--primary)' : 'var(--bg-hover)', color: tab === t ? 'var(--primary-fg)' : 'var(--text-soft)', transition: 'all var(--t)' }}>
-            {lbl}
-          </button>
+          <button key={t} className={`tab-btn${tab === t ? ' active' : ''}`} onClick={() => setTab(t)}>{lbl}</button>
         ))}
       </div>
 
-      {exitoMsg && (
-        <div style={{ background: 'var(--green-bg)', color: 'var(--green)', border: '1px solid var(--green)', borderRadius: 'var(--r-md)', padding: '0.85rem 1rem', marginBottom: '1rem', fontWeight: 600 }}>
-          {exitoMsg}
-        </div>
-      )}
+      {exitoMsg && <div className="alert alert-success" style={{ marginBottom: '1rem' }}>{exitoMsg}</div>}
 
-      {loading ? <Spinner /> : tab === 'catalogo' ? (
+      {loading ? (
+        <div className="loading-center"><div className="spinner" /><span>Cargando…</span></div>
+      ) : tab === 'catalogo' ? (
         <>
           <div style={{ marginBottom: '1rem' }}>
-            <input
-              style={{ width: '100%', maxWidth: 380, background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', padding: '0.5rem 0.9rem', color: 'var(--text)', fontSize: '0.85rem' }}
+            <input className="form-input" style={{ maxWidth: 360 }}
               placeholder="🔍 Buscar por variedad, finca o productor…"
-              value={filtro} onChange={e => setFiltro(e.target.value)}
-            />
+              value={filtro} onChange={e => setFiltro(e.target.value)} />
           </div>
           {lotesFiltrados.length === 0 ? (
-            <Empty mensaje="No hay lotes disponibles en este momento." />
+            <div className="empty-state"><div className="empty-icon">☕</div><p>No hay lotes disponibles.</p></div>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))', gap: '1rem' }}>
               {lotesFiltrados.map(lote => (
-                <LoteCard
-                  key={lote.idlote_cafe}
-                  lote={lote}
+                <LoteCard key={lote.idlote_cafe} lote={lote}
                   enCarrito={carrito.some(l => l.lote.idlote_cafe === lote.idlote_cafe)}
-                  onAgregar={cantidad => { agregarAlCarrito(lote, cantidad); setTab('catalogo') }}
-                  onQuitar={() => quitarDelCarrito(lote.idlote_cafe)}
-                />
+                  onAgregar={cant => { agregarCarrito(lote, cant) }}
+                  onQuitar={() => quitarCarrito(lote.idlote_cafe)} />
               ))}
             </div>
           )}
         </>
       ) : tab === 'carrito' ? (
-        <CarritoView
-          carrito={carrito} totalKg={totalCarritoKg} totalCOP={totalCarritoCOP}
-          onQuitar={quitarDelCarrito} onConfirmar={confirmarCompra}
+        <CarritoView carrito={carrito} totalKg={totalCarritoKg} totalCOP={totalCarritoCOP}
+          onQuitar={quitarCarrito} onConfirmar={confirmarCompra}
           comprando={comprando} errorCompra={errorCompra}
-          onVerCatalogo={() => setTab('catalogo')}
-        />
-      ) : ventas.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-dim)', background: 'var(--bg-card)', borderRadius: 'var(--r-xl)', border: '1px dashed var(--border)' }}>
-          <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>🛒</div>
-          <p style={{ fontSize: '0.88rem', marginBottom: '0.5rem' }}>Aún no tienes compras registradas.</p>
-          <button className="btn btn-primary" style={{ marginTop: '0.75rem', fontSize: '0.82rem' }} onClick={() => setTab('catalogo')}>Ver catálogo</button>
-        </div>
+          onVerCatalogo={() => setTab('catalogo')} />
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-          {ventas.map(v => (
-            <div key={v.idventa} style={{ background: 'var(--bg-card)', border: '1px solid var(--border-soft)', borderRadius: 'var(--r-lg)', padding: '1.15rem 1.25rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.6rem' }}>
-                <div>
-                  <div style={{ fontWeight: 700, color: 'var(--text)', fontSize: '0.92rem' }}>
-                    Compra #{v.idventa}
-                    <span style={{ marginLeft: '0.5rem', padding: '0.1rem 0.5rem', borderRadius: '99px', fontSize: '0.68rem', background: 'var(--green-bg)', color: 'var(--green)', fontWeight: 700 }}>✓ Completada</span>
-                  </div>
-                  <div style={{ color: 'var(--text-dim)', fontSize: '0.78rem', marginTop: '0.1rem' }}>
-                    {new Date(v.fecha_venta).toLocaleDateString('es-CO', { dateStyle: 'long' })}
-                  </div>
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                  {v.total_kg && <div style={{ fontWeight: 700, color: 'var(--primary)', fontSize: '1.05rem' }}>{v.total_kg} kg</div>}
-                  {v.total_kg && v.precio_kg && (
-                    <div style={{ color: 'var(--text-dim)', fontSize: '0.78rem' }}>
-                      ${(v.total_kg * v.precio_kg).toLocaleString('es-CO')} total
-                    </div>
-                  )}
-                </div>
-              </div>
-              {v.detalle_venta?.length > 0 && (
-                <div style={{ borderTop: '1px solid var(--border-soft)', paddingTop: '0.6rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-                  {v.detalle_venta.map(d => (
-                    <div key={d.iddetalle_venta} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-soft)' }}>
-                      <span>☕ {d.lote_cafe?.variedad ?? '—'}{d.lote_cafe?.finca ? ` · ${d.lote_cafe.finca.nombre}` : ''}</span>
-                      <span style={{ fontWeight: 600 }}>{d.cantidad} kg — ${(d.cantidad * d.precio_venta).toLocaleString('es-CO')}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {v.notas && <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)', marginTop: '0.4rem' }}>📝 {v.notas}</div>}
-            </div>
-          ))}
-        </div>
+        <HistorialCompras ventas={ventas} onVerCatalogo={() => setTab('catalogo')} />
       )}
     </div>
   )
 }
 
-// ── Tarjeta de lote: precio fijo (read-only), solo se elige cantidad ──────────
+// ── Tarjeta de lote ───────────────────────────────────────────────────────────
 function LoteCard({ lote, enCarrito, onAgregar, onQuitar }: {
-  lote: Lote
-  enCarrito: boolean
-  onAgregar: (cantidad: number) => void
-  onQuitar: () => void
+  lote: Lote; enCarrito: boolean
+  onAgregar: (cantidad: number) => void; onQuitar: () => void
 }) {
-  const [abierto, setAbierto]   = useState(false)
+  const [abierto, setAbierto] = useState(false)
   const [cantidad, setCantidad] = useState(Math.min(50, lote.peso_kg))
-  const procesosUnicos = [...new Set(lote.registro_proceso?.map(r => r.proceso?.nombre).filter(Boolean))]
+  const procesos = [...new Set(lote.registro_proceso?.map(r => r.proceso?.nombre).filter(Boolean))]
 
   return (
-    <div style={{
-      background: 'var(--bg-card)',
-      border: `1px solid ${enCarrito ? 'var(--green)' : 'var(--border-soft)'}`,
-      borderRadius: 'var(--r-xl)', padding: '1.25rem',
-      display: 'flex', flexDirection: 'column', gap: '0.6rem',
-      transition: 'border-color var(--t)',
-    }}>
+    <div className={`lote-card${enCarrito ? ' in-cart' : ''}`}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
-          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1.05rem', color: 'var(--text)' }}>{lote.variedad}</div>
-          {lote.finca && <div style={{ fontSize: '0.78rem', color: 'var(--text-dim)', marginTop: '0.15rem' }}>🏡 {lote.finca.nombre}{lote.finca.ubicacion ? ` · ${lote.finca.ubicacion}` : ''}</div>}
+          <div className="lote-card-title">{lote.variedad}</div>
+          {lote.finca && <div style={{ fontSize: '0.76rem', color: 'var(--text-dim)', marginTop: '0.1rem' }}>🏡 {lote.finca.nombre}{lote.finca.ubicacion ? ` · ${lote.finca.ubicacion}` : ''}</div>}
         </div>
-        <span className="badge badge-green" style={{ flexShrink: 0 }}>Disponible</span>
+        <span className="badge badge-green">Disponible</span>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem' }}>
-        <Stat label="Stock"     value={`${lote.peso_kg} kg`} />
-        <Stat label="Cosecha"   value={new Date(lote.fecha_cosecha).toLocaleDateString('es-CO', { month: 'short', year: 'numeric' })} />
-        {lote.finca?.productor && <Stat label="Productor" value={lote.finca.productor.nombre} />}
-        {procesosUnicos.length > 0 && <Stat label="Proceso" value={procesosUnicos.join(', ')} />}
+      <div className="lote-stats">
+        <div className="lote-stat">
+          <div className="lote-stat-label">Stock</div>
+          <div className="lote-stat-value">{lote.peso_kg} kg</div>
+        </div>
+        <div className="lote-stat">
+          <div className="lote-stat-label">Cosecha</div>
+          <div className="lote-stat-value">{new Date(lote.fecha_cosecha).toLocaleDateString('es-CO', { month: 'short', year: 'numeric' })}</div>
+        </div>
+        {lote.finca?.productor && (
+          <div className="lote-stat">
+            <div className="lote-stat-label">Productor</div>
+            <div className="lote-stat-value">{lote.finca.productor.nombre}</div>
+          </div>
+        )}
+        {procesos.length > 0 && (
+          <div className="lote-stat">
+            <div className="lote-stat-label">Proceso</div>
+            <div className="lote-stat-value">{procesos.join(', ')}</div>
+          </div>
+        )}
       </div>
 
-      {/* Precio fijo — definido por el admin, el cliente NO puede modificarlo */}
-      <div style={{ background: 'var(--bg)', borderRadius: 'var(--r-md)', padding: '0.5rem 0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', fontWeight: 600 }}>Precio / kg</span>
-        <span style={{ fontWeight: 700, color: 'var(--primary)', fontSize: '0.95rem' }}>
-          ${(lote.precio_kg ?? 0).toLocaleString('es-CO')} COP
-        </span>
+      <div className="price-box">
+        <span className="price-label">Precio / kg</span>
+        <span className="price-value">${(lote.precio_kg ?? 0).toLocaleString('es-CO')} COP</span>
       </div>
 
-      {/* Formulario: SOLO cantidad — precio es read-only */}
       {abierto && !enCarrito && (
-        <div style={{ background: 'var(--bg)', borderRadius: 'var(--r-lg)', padding: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+        <div style={{ background: 'var(--bg-1)', borderRadius: 'var(--r-lg)', padding: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
           <div>
-            <label style={lblS}>Cantidad (kg) *</label>
-            <input type="number" style={inpS} value={cantidad} min={1} max={lote.peso_kg}
+            <label style={{ fontSize: '0.74rem', fontWeight: 600, color: 'var(--text-soft)', display: 'block', marginBottom: '0.25rem' }}>
+              Cantidad (kg) — máx {lote.peso_kg} kg
+            </label>
+            <input type="number" className="form-input"
+              value={cantidad} min={1} max={lote.peso_kg}
               onChange={e => setCantidad(Math.min(lote.peso_kg, Math.max(1, Number(e.target.value))))} />
-            <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
-              Máx disponible: {lote.peso_kg} kg · Total: <strong>${(cantidad * (lote.precio_kg ?? 0)).toLocaleString('es-CO')}</strong> COP
+            <div style={{ fontSize: '0.69rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+              Total: <strong>${(cantidad * (lote.precio_kg ?? 0)).toLocaleString('es-CO')}</strong> COP
             </div>
           </div>
           <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <button style={{ flex: 1, ...btnSec }} onClick={() => setAbierto(false)}>Cancelar</button>
-            <button style={{ flex: 2, ...btnPri }} onClick={() => { onAgregar(cantidad); setAbierto(false) }}>
+            <button className="btn btn-secondary btn-sm" style={{ flex: 1 }} onClick={() => setAbierto(false)}>Cancelar</button>
+            <button className="btn btn-primary btn-sm" style={{ flex: 2 }} onClick={() => { onAgregar(cantidad); setAbierto(false) }}>
               🛒 Agregar al carrito
             </button>
           </div>
@@ -383,10 +288,10 @@ function LoteCard({ lote, enCarrito, onAgregar, onQuitar }: {
       {enCarrito ? (
         <div style={{ display: 'flex', gap: '0.5rem' }}>
           <div style={{ flex: 1, background: 'var(--green-bg)', color: 'var(--green)', borderRadius: 'var(--r-md)', padding: '0.4rem 0.8rem', fontSize: '0.82rem', fontWeight: 700, textAlign: 'center' }}>✓ En carrito</div>
-          <button style={{ ...btnSec, fontSize: '0.78rem' }} onClick={onQuitar}>Quitar</button>
+          <button className="btn btn-secondary btn-sm" onClick={onQuitar}>Quitar</button>
         </div>
       ) : !abierto ? (
-        <button style={{ ...btnPri, width: '100%', marginTop: '0.15rem' }} onClick={() => setAbierto(true)}>
+        <button className="btn btn-primary" style={{ width: '100%' }} onClick={() => setAbierto(true)}>
           🛒 Comprar este lote
         </button>
       ) : null}
@@ -394,22 +299,17 @@ function LoteCard({ lote, enCarrito, onAgregar, onQuitar }: {
   )
 }
 
-// ── Vista del carrito ─────────────────────────────────────────────────────────
+// ── Vista carrito ─────────────────────────────────────────────────────────────
 function CarritoView({ carrito, totalKg, totalCOP, onQuitar, onConfirmar, comprando, errorCompra, onVerCatalogo }: {
-  carrito: LineaCompra[]
-  totalKg: number
-  totalCOP: number
-  onQuitar: (id: number) => void
-  onConfirmar: () => void
-  comprando: boolean
-  errorCompra: string | null
-  onVerCatalogo: () => void
+  carrito: LineaCarrito[]; totalKg: number; totalCOP: number
+  onQuitar: (id: number) => void; onConfirmar: () => void
+  comprando: boolean; errorCompra: string | null; onVerCatalogo: () => void
 }) {
   if (carrito.length === 0) return (
-    <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-dim)', background: 'var(--bg-card)', borderRadius: 'var(--r-xl)', border: '1px dashed var(--border)' }}>
-      <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>🛒</div>
-      <p style={{ marginBottom: '1rem', fontSize: '0.88rem' }}>Tu carrito está vacío.</p>
-      <button className="btn btn-primary" style={{ fontSize: '0.82rem' }} onClick={onVerCatalogo}>Ver catálogo</button>
+    <div className="empty-state">
+      <div className="empty-icon">🛒</div>
+      <p>Tu carrito está vacío.</p>
+      <button className="btn btn-primary" style={{ marginTop: '0.75rem' }} onClick={onVerCatalogo}>Ver catálogo</button>
     </div>
   )
   return (
@@ -417,7 +317,7 @@ function CarritoView({ carrito, totalKg, totalCOP, onQuitar, onConfirmar, compra
       {errorCompra && <div className="alert alert-error" style={{ marginBottom: '1rem' }}>⚠ {errorCompra}</div>}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', marginBottom: '1.25rem' }}>
         {carrito.map(l => (
-          <div key={l.lote.idlote_cafe} style={{ background: 'var(--bg-card)', border: '1px solid var(--border-soft)', borderRadius: 'var(--r-lg)', padding: '0.9rem 1.1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <div key={l.lote.idlote_cafe} className="venta-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
             <div>
               <div style={{ fontWeight: 700, color: 'var(--text)', fontSize: '0.9rem' }}>☕ {l.lote.variedad}</div>
               <div style={{ fontSize: '0.76rem', color: 'var(--text-dim)' }}>
@@ -425,28 +325,30 @@ function CarritoView({ carrito, totalKg, totalCOP, onQuitar, onConfirmar, compra
               </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <div style={{ fontWeight: 700, color: 'var(--primary)', fontSize: '1rem', textAlign: 'right' }}>
+              <strong style={{ color: 'var(--primary)', fontSize: '1rem' }}>
                 ${(l.cantidad * (l.lote.precio_kg ?? 0)).toLocaleString('es-CO')}
-              </div>
-              <button style={{ ...btnSec, fontSize: '0.74rem', padding: '0.25rem 0.5rem' }} onClick={() => onQuitar(l.lote.idlote_cafe)}>✕</button>
+              </strong>
+              <button className="btn btn-danger btn-sm" onClick={() => onQuitar(l.lote.idlote_cafe)}>✕</button>
             </div>
           </div>
         ))}
       </div>
-      <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--r-xl)', padding: '1.25rem', marginBottom: '1rem' }}>
+
+      <div className="venta-card" style={{ marginBottom: '1rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', fontSize: '0.88rem', color: 'var(--text-soft)' }}>
           <span>Total kg:</span><span style={{ fontWeight: 700 }}>{totalKg} kg</span>
         </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.1rem', fontWeight: 700, color: 'var(--text)', borderTop: '1px solid var(--border-soft)', paddingTop: '0.6rem', marginTop: '0.6rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.05rem', fontWeight: 700, color: 'var(--text)', borderTop: '1px solid var(--border-soft)', paddingTop: '0.6rem', marginTop: '0.6rem' }}>
           <span>Total a pagar:</span>
           <span style={{ color: 'var(--primary)' }}>${totalCOP.toLocaleString('es-CO')}</span>
         </div>
       </div>
-      <div style={{ background: 'var(--amber-bg)', border: '1px solid var(--amber)', borderRadius: 'var(--r-md)', padding: '0.8rem 1rem', marginBottom: '1.25rem', fontSize: '0.8rem', color: 'var(--amber)' }}>
-        💡 Al confirmar, la compra se registra en la BD y el stock del lote se descuenta automáticamente para todos los usuarios.
+
+      <div className="alert alert-warn" style={{ marginBottom: '1.25rem', fontSize: '0.78rem' }}>
+        💡 Al confirmar, el stock se descuenta automáticamente en toda la plataforma.
       </div>
-      <button
-        style={{ width: '100%', padding: '0.7rem', borderRadius: 'var(--r-md)', background: comprando ? 'var(--border)' : 'var(--primary)', color: 'var(--primary-fg)', border: 'none', fontWeight: 700, fontSize: '0.95rem', cursor: comprando ? 'not-allowed' : 'pointer' }}
+
+      <button className="btn btn-primary" style={{ width: '100%', padding: '0.7rem', fontSize: '0.95rem' }}
         onClick={onConfirmar} disabled={comprando}>
         {comprando ? '⏳ Procesando…' : '✓ Confirmar compra'}
       </button>
@@ -454,20 +356,49 @@ function CarritoView({ carrito, totalKg, totalCOP, onQuitar, onConfirmar, compra
   )
 }
 
-const lblS: React.CSSProperties = { fontSize: '0.74rem', fontWeight: 600, color: 'var(--text-soft)', display: 'block', marginBottom: '0.25rem' }
-const inpS: React.CSSProperties = { width: '100%', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', padding: '0.4rem 0.6rem', color: 'var(--text)', fontSize: '0.85rem' }
-const btnPri: React.CSSProperties = { padding: '0.45rem 1rem', border: 'none', borderRadius: 'var(--r-md)', background: 'var(--primary)', color: 'var(--primary-fg)', fontWeight: 700, fontSize: '0.82rem', cursor: 'pointer' }
-const btnSec: React.CSSProperties = { padding: '0.45rem 0.75rem', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', background: 'transparent', color: 'var(--text-soft)', fontWeight: 600, fontSize: '0.82rem', cursor: 'pointer' }
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div style={{ background: 'var(--bg)', borderRadius: 'var(--r)', padding: '0.4rem 0.6rem' }}>
-      <div style={{ fontSize: '0.64rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700 }}>{label}</div>
-      <div style={{ fontSize: '0.82rem', color: 'var(--text-soft)', fontWeight: 600, marginTop: '0.1rem' }}>{value}</div>
+// ── Historial de compras ──────────────────────────────────────────────────────
+function HistorialCompras({ ventas, onVerCatalogo }: { ventas: VentaHistorial[]; onVerCatalogo: () => void }) {
+  if (ventas.length === 0) return (
+    <div className="empty-state">
+      <div className="empty-icon">📦</div>
+      <p>Aún no tienes compras registradas.</p>
+      <button className="btn btn-primary" style={{ marginTop: '0.75rem' }} onClick={onVerCatalogo}>Ver catálogo</button>
     </div>
   )
-}
-function Spinner() { return <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-dim)' }}>Cargando…</div> }
-function Empty({ mensaje }: { mensaje: string }) {
-  return <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-dim)', background: 'var(--bg-card)', borderRadius: 'var(--r-xl)', border: '1px dashed var(--border)' }}><div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>☕</div><p style={{ fontSize: '0.88rem' }}>{mensaje}</p></div>
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+      {ventas.map(v => (
+        <div key={v.idventa} className="venta-card">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.6rem' }}>
+            <div>
+              <div style={{ fontWeight: 700, color: 'var(--text)', fontSize: '0.92rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                Compra #{v.idventa}
+                <span className="badge badge-green">✓ Completada</span>
+              </div>
+              <div style={{ color: 'var(--text-dim)', fontSize: '0.76rem', marginTop: '0.1rem' }}>
+                {new Date(v.fecha_venta).toLocaleDateString('es-CO', { dateStyle: 'long' })}
+              </div>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              {v.total_kg && <div style={{ fontWeight: 700, color: 'var(--primary)', fontSize: '1rem' }}>{v.total_kg} kg</div>}
+              {v.total_kg && v.precio_kg && (
+                <div style={{ color: 'var(--text-dim)', fontSize: '0.76rem' }}>${(v.total_kg * v.precio_kg).toLocaleString('es-CO')}</div>
+              )}
+            </div>
+          </div>
+          {(v.detalle_venta ?? []).length > 0 && (
+            <div style={{ borderTop: '1px solid var(--border-soft)', paddingTop: '0.6rem', display: 'flex', flexDirection: 'column', gap: '0.28rem' }}>
+              {v.detalle_venta.map(d => (
+                <div key={d.iddetalle_venta} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.79rem', color: 'var(--text-soft)' }}>
+                  <span>☕ {d.lote_cafe?.variedad ?? '—'}{d.lote_cafe?.finca ? ` · ${d.lote_cafe.finca.nombre}` : ''}</span>
+                  <span style={{ fontWeight: 600 }}>{d.cantidad} kg — ${(d.cantidad * d.precio_venta).toLocaleString('es-CO')}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          {v.notas && <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginTop: '0.4rem' }}>📝 {v.notas}</div>}
+        </div>
+      ))}
+    </div>
+  )
 }

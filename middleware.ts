@@ -1,78 +1,98 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-/**
- * Middleware de Next.js — Café Almacén v2
- *
- * Responsabilidades:
- *  1. Refrescar el token de sesión de Supabase en cada request
- *  2. Proteger las rutas /admin: redirigir a /login si no hay sesión
- *  3. Redirigir a /admin si ya hay sesión y el usuario intenta ir a /login o /register
- */
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
 
-  // Crear cliente de Supabase SSR que opera sobre las cookies del request
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        getAll() {
-          return request.cookies.getAll()
-        },
-        setAll(cookiesToSet: { name: string; value: string; options?: Record<string, unknown> }[]) {
-          // Propagar cookies en el request y en la respuesta
-          cookiesToSet.forEach(({ name, value }) =>
-            request.cookies.set(name, value)
-          )
+        getAll() { return request.cookies.getAll() },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
           supabaseResponse = NextResponse.next({ request })
           cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(
-              name,
-              value,
-              options as Parameters<typeof supabaseResponse.cookies.set>[2]
-            )
+            supabaseResponse.cookies.set(name, value, options as any)
           )
         },
       },
     }
   )
 
-  // IMPORTANTE: getUser() refresca el token si está por expirar.
-  // No usar getSession() aquí — puede devolver datos obsoletos del cookie.
   const { data: { user } } = await supabase.auth.getUser()
-
   const { pathname } = request.nextUrl
 
-  // ── Rutas protegidas: /admin/** y /portal/** ──────────────────
-  if (pathname.startsWith('/admin') || pathname.startsWith('/portal')) {
-    if (!user) {
-      const loginUrl = request.nextUrl.clone()
-      loginUrl.pathname = '/login'
-      return NextResponse.redirect(loginUrl)
+  // Helper: redirect helper
+  const to = (path: string) => {
+    const url = request.nextUrl.clone()
+    url.pathname = path
+    return NextResponse.redirect(url)
+  }
+
+  // ── No autenticado → redirigir a /login ──────────────────────────
+  if (!user) {
+    if (pathname.startsWith('/admin') || pathname.startsWith('/portal') ||
+        pathname.startsWith('/operador') || pathname.startsWith('/vendedor') ||
+        pathname.startsWith('/cliente')) {
+      return to('/login')
     }
+    if (pathname === '/') return to('/login')
+    return supabaseResponse
   }
 
-  // ── Redirigir si ya está autenticado y va a /login o /register ──
-  if ((pathname === '/login' || pathname === '/register') && user) {
-    const adminUrl = request.nextUrl.clone()
-    adminUrl.pathname = '/admin'
-    return NextResponse.redirect(adminUrl)
+  // ── Autenticado: obtener rol ──────────────────────────────────────
+  let rolNombre = ''
+  try {
+    const { data } = await supabase
+      .from('usuario')
+      .select('rol:idrol(nombre), estado_aprobacion')
+      .eq('auth_uid', user.id)
+      .maybeSingle()
+
+    rolNombre = (data as any)?.rol?.nombre ?? ''
+    const estado = (data as any)?.estado_aprobacion ?? 'pendiente'
+
+    // Si el usuario no está aprobado y trata de acceder a zonas protegidas
+    if (estado !== 'aprobado' && !pathname.startsWith('/portal')) {
+      if (pathname !== '/login' && pathname !== '/register') {
+        return to('/portal')
+      }
+    }
+  } catch {}
+
+  // ── Redirigir /login y /register si ya autenticado ────────────────
+  if (pathname === '/login' || pathname === '/register') {
+    if (rolNombre === 'Administrador') return to('/admin')
+    if (rolNombre === 'Vendedor') return to('/vendedor')
+    if (rolNombre === 'Operador') return to('/operador')
+    return to('/portal')
   }
 
-  // ── Redirigir raíz '/' al login si no está autenticado ─────────
-  if (pathname === '/' && !user) {
-    const loginUrl = request.nextUrl.clone()
-    loginUrl.pathname = '/login'
-    return NextResponse.redirect(loginUrl)
+  // ── Redirigir raíz ────────────────────────────────────────────────
+  if (pathname === '/') {
+    if (rolNombre === 'Administrador') return to('/admin')
+    if (rolNombre === 'Vendedor') return to('/vendedor')
+    if (rolNombre === 'Operador') return to('/operador')
+    return to('/portal')
   }
 
-  // ── Redirigir raíz '/' al admin si ya está autenticado ─────────
-  if (pathname === '/' && user) {
-    const adminUrl = request.nextUrl.clone()
-    adminUrl.pathname = '/admin'
-    return NextResponse.redirect(adminUrl)
+  // ── Proteger /admin: solo Administrador ───────────────────────────
+  if (pathname.startsWith('/admin') && rolNombre !== 'Administrador') {
+    if (rolNombre === 'Vendedor') return to('/vendedor')
+    if (rolNombre === 'Operador') return to('/operador')
+    return to('/portal')
+  }
+
+  // ── Proteger /vendedor ────────────────────────────────────────────
+  if (pathname.startsWith('/vendedor') && rolNombre !== 'Vendedor' && rolNombre !== 'Administrador') {
+    return to('/portal')
+  }
+
+  // ── Proteger /operador ────────────────────────────────────────────
+  if (pathname.startsWith('/operador') && rolNombre !== 'Operador' && rolNombre !== 'Administrador') {
+    return to('/portal')
   }
 
   return supabaseResponse
@@ -80,13 +100,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    /*
-     * Ejecutar middleware en todas las rutas EXCEPTO:
-     * - _next/static  (archivos estáticos)
-     * - _next/image   (optimización de imágenes)
-     * - favicon.ico
-     * - archivos con extensión (png, jpg, svg, etc.)
-     */
     '/((?!_next/static|_next/image|favicon\\.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }
