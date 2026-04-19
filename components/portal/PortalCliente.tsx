@@ -34,23 +34,38 @@ export default function PortalCliente({ usuario }: { usuario: UsuarioPortal }) {
   const [exitoMsg, setExitoMsg] = useState<string | null>(null)
 
   const cargar = useCallback(async () => {
-    // ── 1. Obtener-o-crear cliente de forma atómica (upsert por email UNIQUE) ──
-    const { data: clienteRow, error: clienteErr } = await supabase
-      .from('cliente')
-      .upsert(
-        { nombre: usuario.nombre, email: usuario.email },
-        { onConflict: 'email' }
-      )
-      .select('idcliente')
-      .single()
+    // ── 1. Obtener-o-crear cliente (Resiliente a duplicados si no se ha corrido el SQL) ──
+    let clienteId: number | null = null
 
-    if (clienteErr || !clienteRow) {
-      console.warn('[PortalCliente] Error resolviendo cliente:', clienteErr?.message)
-      setLoading(false)
-      return
+    try {
+      // Buscar por email (limit 1 evita el error de maybeSingle si hay duplicados)
+      const { data: byEmail } = await supabase
+        .from('cliente').select('idcliente').eq('email', usuario.email).limit(1)
+
+      if (byEmail && byEmail.length > 0) {
+        clienteId = byEmail[0].idcliente
+      } else {
+        // Fallback: buscar por nombre
+        const { data: byNombre } = await supabase
+          .from('cliente').select('idcliente').eq('nombre', usuario.nombre).limit(1)
+
+        if (byNombre && byNombre.length > 0) {
+          clienteId = byNombre[0].idcliente
+          await supabase.from('cliente').update({ email: usuario.email }).eq('idcliente', clienteId)
+        } else {
+          // Si no existe, crearlo
+          const { data: nCliente } = await supabase
+            .from('cliente')
+            .insert({ nombre: usuario.nombre, email: usuario.email })
+            .select('idcliente')
+            .single()
+          if (nCliente) clienteId = nCliente.idcliente
+        }
+      }
+    } catch (e) {
+      console.warn('[PortalCliente] Error resolviendo cliente:', e)
     }
 
-    const clienteId = clienteRow.idcliente
     setIdCliente(clienteId)
 
     // ── 2. Cargar lotes disponibles + historial de compras en paralelo ──
@@ -61,11 +76,13 @@ export default function PortalCliente({ usuario }: { usuario: UsuarioPortal }) {
         registro_proceso(proceso(nombre))
       `).eq('estado', 'disponible').gt('peso_kg', 0).order('fecha_cosecha', { ascending: false }),
 
-      supabase.from('venta').select(`
-        idventa, fecha_venta, total_kg, precio_kg, notas,
-        detalle_venta(iddetalle_venta, cantidad, precio_venta,
-          lote_cafe:idlote_cafe(variedad, finca:idfinca(nombre)))
-      `).eq('idcliente', clienteId).order('fecha_venta', { ascending: false }),
+      clienteId
+        ? supabase.from('venta').select(`
+            idventa, fecha_venta, total_kg, precio_kg, notas,
+            detalle_venta(iddetalle_venta, cantidad, precio_venta,
+              lote_cafe:idlote_cafe(variedad, finca:idfinca(nombre)))
+          `).eq('idcliente', clienteId).order('fecha_venta', { ascending: false })
+        : Promise.resolve({ data: [], error: null }),
     ])
 
     if (lotesRes.error) console.warn('[PortalCliente] Error cargando lotes:', lotesRes.error.message)
