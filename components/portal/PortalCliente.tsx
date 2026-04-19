@@ -32,25 +32,37 @@ export default function PortalCliente({ usuario }: { usuario: UsuarioPortal }) {
   const [exitoMsg, setExitoMsg] = useState<string | null>(null)
 
   const cargar = useCallback(async () => {
-    // 1. Buscar o crear cliente vinculado al usuario
-    let { data: clienteRows } = await supabase
+    // 1. Buscar cliente por email (campo único y confiable)
+    let { data: byEmail } = await supabase
       .from('cliente').select('idcliente, email, nombre')
-      .or(`email.eq.${usuario.email},nombre.eq.${usuario.nombre}`)
+      .eq('email', usuario.email)
+      .maybeSingle()
 
-    let clienteRow = clienteRows?.find(c => c.email === usuario.email) ?? clienteRows?.[0] ?? null
+    let clienteId: number | null = byEmail?.idcliente ?? null
 
-    if (!clienteRow) {
-      const { data: nuevo } = await supabase.from('cliente')
-        .insert({ nombre: usuario.nombre, email: usuario.email })
-        .select('idcliente').single()
-      clienteRow = nuevo as any
-    } else if (!clienteRow.email) {
-      await supabase.from('cliente').update({ email: usuario.email }).eq('idcliente', clienteRow.idcliente)
+    if (!clienteId) {
+      // Intentar por nombre como fallback
+      let { data: byNombre } = await supabase
+        .from('cliente').select('idcliente, email, nombre')
+        .eq('nombre', usuario.nombre)
+        .maybeSingle()
+
+      if (byNombre) {
+        clienteId = byNombre.idcliente
+        // Vincular email si falta
+        if (!byNombre.email) {
+          await supabase.from('cliente').update({ email: usuario.email }).eq('idcliente', clienteId)
+        }
+      } else {
+        // Crear nuevo cliente
+        const { data: nuevo } = await supabase.from('cliente')
+          .insert({ nombre: usuario.nombre, email: usuario.email })
+          .select('idcliente').single()
+        clienteId = (nuevo as any)?.idcliente ?? null
+      }
     }
 
-    const mainId = clienteRow?.idcliente ?? null
-    setIdCliente(mainId)
-    const allIds = Array.from(new Set((clienteRows ?? []).map(c => c.idcliente).concat(mainId ? [mainId] : []).filter(Boolean)))
+    setIdCliente(clienteId)
 
     const [{ data: l }, { data: v }] = await Promise.all([
       supabase.from('lote_cafe').select(`
@@ -59,12 +71,12 @@ export default function PortalCliente({ usuario }: { usuario: UsuarioPortal }) {
         registro_proceso(proceso(nombre))
       `).eq('estado', 'disponible').gt('peso_kg', 0).order('fecha_cosecha', { ascending: false }),
 
-      allIds.length > 0
+      clienteId
         ? supabase.from('venta').select(`
             idventa, fecha_venta, total_kg, precio_kg, notas,
             detalle_venta(iddetalle_venta, cantidad, precio_venta,
               lote_cafe:idlote_cafe(variedad, finca:idfinca(nombre)))
-          `).in('idcliente', allIds).order('fecha_venta', { ascending: false })
+          `).eq('idcliente', clienteId).order('fecha_venta', { ascending: false })
         : Promise.resolve({ data: [] }),
     ])
 
@@ -123,11 +135,13 @@ export default function PortalCliente({ usuario }: { usuario: UsuarioPortal }) {
       if (dErr) throw new Error(dErr.message)
 
       const totalCOP = carrito.reduce((s, l) => s + l.cantidad * l.lote.precio_kg, 0)
+      const msgExito = `✅ Compra #${ventaData.idventa} registrada — ${totalKg} kg por $${totalCOP.toLocaleString('es-CO')} COP`
       setCarrito([])
-      setExitoMsg(`✅ Compra #${ventaData.idventa} registrada — ${totalKg} kg por $${totalCOP.toLocaleString('es-CO')} COP`)
-      setTab('compras')
-      setTimeout(() => { setExitoMsg(null) }, 4000)
+      // Recargar datos primero, luego mostrar mensaje y cambiar tab
       await cargar()
+      setExitoMsg(msgExito)
+      setTab('compras')
+      setTimeout(() => { setExitoMsg(null) }, 5000)
     } catch (e: any) { setErrorCompra(e.message) }
     finally { setComprando(false) }
   }
@@ -241,6 +255,7 @@ function LoteCard({ lote, enCarrito, onAgregar, onQuitar }: {
         <div className="lote-stat">
           <div className="lote-stat-label">Stock</div>
           <div className="lote-stat-value">{lote.peso_kg} kg</div>
+          <div style={{ fontSize: '0.72rem', color: 'var(--amber)', fontWeight: 700, marginTop: '0.1rem' }}>📦 {(lote.peso_kg / 70).toFixed(2)} bultos</div>
         </div>
         <div className="lote-stat">
           <div className="lote-stat-label">Cosecha</div>
@@ -279,13 +294,13 @@ function LoteCard({ lote, enCarrito, onAgregar, onQuitar }: {
                 <span>Precio/kg:</span>
                 <span style={{ fontWeight: 600 }}>${(lote.precio_kg ?? 0).toLocaleString('es-CO')} COP</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.76rem', color: 'var(--text-soft)' }}>
-                <span>Equivale a:</span>
-                <span style={{ fontWeight: 600 }}>{(cantidad / 70).toFixed(2)} bultos <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>(1 bulto = 70 kg)</span></span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.82rem' }}>
+                <span style={{ color: 'var(--text-soft)' }}>📦 Bultos:</span>
+                <span style={{ fontWeight: 800, color: 'var(--amber)', fontSize: '0.95rem' }}>{(cantidad / 70).toFixed(2)} <span style={{ fontWeight: 500, fontSize: '0.72rem', color: 'var(--text-muted)' }}>(1 bulto = 70 kg)</span></span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--border-soft)', paddingTop: '0.4rem', marginTop: '0.2rem' }}>
-                <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text)' }}>Total a pagar:</span>
-                <span style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--primary)' }}>${(cantidad * (lote.precio_kg ?? 0)).toLocaleString('es-CO')} COP</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '2px solid var(--primary)', paddingTop: '0.5rem', marginTop: '0.3rem' }}>
+                <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text)' }}>💰 Total:</span>
+                <span style={{ fontSize: '1.15rem', fontWeight: 900, color: 'var(--primary)', letterSpacing: '-0.01em' }}>${(cantidad * (lote.precio_kg ?? 0)).toLocaleString('es-CO')} COP</span>
               </div>
             </div>
           </div>
@@ -393,10 +408,11 @@ function HistorialCompras({ ventas, onVerCatalogo }: { ventas: VentaHistorial[];
               </div>
             </div>
             <div style={{ textAlign: 'right' }}>
-              {v.total_kg && <div style={{ fontWeight: 700, color: 'var(--primary)', fontSize: '1rem' }}>{v.total_kg} kg</div>}
-              {v.total_kg && v.precio_kg && (
-                <div style={{ color: 'var(--text-dim)', fontSize: '0.76rem' }}>${(v.total_kg * v.precio_kg).toLocaleString('es-CO')}</div>
-              )}
+              {v.total_kg && <>
+                <div style={{ fontWeight: 700, color: 'var(--primary)', fontSize: '1rem' }}>{v.total_kg} kg</div>
+                <div style={{ fontSize: '0.78rem', color: 'var(--amber)', fontWeight: 700 }}>📦 {(v.total_kg / 70).toFixed(2)} bultos</div>
+                {v.precio_kg && <div style={{ color: 'var(--text-dim)', fontSize: '0.76rem' }}>${(v.total_kg * v.precio_kg).toLocaleString('es-CO')} COP</div>}
+              </>}
             </div>
           </div>
           {(v.detalle_venta ?? []).length > 0 && (

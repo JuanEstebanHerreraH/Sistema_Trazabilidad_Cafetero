@@ -70,8 +70,9 @@ function PortalVendedor({ usuario, onLogout }: { usuario: UsuarioPortal; onLogou
 
   useEffect(() => { cargar() }, [cargar])
 
-  const totalVentasCOP = ventas.reduce((s, v) => s + (v.total_kg ?? 0) * (v.precio_kg ?? 0), 0)
-  const totalKgVendido = ventas.reduce((s, v) => s + (v.total_kg ?? 0), 0)
+  // Calcular desde detalle_venta para mayor precisión (no depende del trigger)
+  const totalVentasCOP = ventas.reduce((s, v) => s + (v.detalle_venta ?? []).reduce((ds: number, d: any) => ds + d.cantidad * d.precio_venta, 0), 0)
+  const totalKgVendido = ventas.reduce((s, v) => s + (v.detalle_venta ?? []).reduce((ds: number, d: any) => ds + d.cantidad, 0), 0)
   const lotesDisponibles = lotes.length
   const kgDisponibles = lotes.reduce((s, l) => s + Number(l.peso_kg ?? 0), 0)
 
@@ -152,12 +153,15 @@ function PortalVendedor({ usuario, onLogout }: { usuario: UsuarioPortal; onLogou
                     </div>
                   </div>
                   <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontWeight: 800, color: 'var(--primary)', fontSize: '1rem' }}>
-                      ${((v.total_kg ?? 0) * (v.precio_kg ?? 0)).toLocaleString('es-CO')} COP
-                    </div>
-                    <div style={{ fontSize: '0.76rem', color: 'var(--text-dim)' }}>
-                      {v.total_kg} kg · {((v.total_kg ?? 0) / 70).toFixed(1)} bultos
-                    </div>
+                    {(() => {
+                      const kgV = (v.detalle_venta ?? []).reduce((s: number, d: any) => s + d.cantidad, 0)
+                      const copV = (v.detalle_venta ?? []).reduce((s: number, d: any) => s + d.cantidad * d.precio_venta, 0)
+                      return <>
+                        <div style={{ fontWeight: 800, color: 'var(--primary)', fontSize: '1rem' }}>${copV.toLocaleString('es-CO')} COP</div>
+                        <div style={{ fontSize: '0.78rem', color: 'var(--text-dim)', fontWeight: 600 }}>{kgV} kg</div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--amber)', fontWeight: 700 }}>📦 {(kgV / 70).toFixed(2)} bultos</div>
+                      </>
+                    })()}
                   </div>
                 </div>
                 {(v.detalle_venta ?? []).length > 0 && (

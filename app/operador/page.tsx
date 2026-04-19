@@ -141,7 +141,7 @@ function PortalOperador({ usuario, onLogout }: { usuario: UsuarioPortal; onLogou
                     <td style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>{l.idlote_cafe}</td>
                     <td><strong style={{ color: 'var(--text)' }}>{l.variedad}</strong></td>
                     <td>{l.finca?.nombre ?? '—'}</td>
-                    <td><strong style={{ color: 'var(--primary)' }}>{Number(l.peso_kg).toLocaleString('es-CO')} kg</strong><br /><span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>{(l.peso_kg / 70).toFixed(1)} bultos</span></td>
+                    <td><strong style={{ color: 'var(--primary)', fontSize: '1rem' }}>{Number(l.peso_kg).toLocaleString('es-CO')} kg</strong><br /><span style={{ fontSize: '0.8rem', color: 'var(--amber)', fontWeight: 700 }}>📦 {(l.peso_kg / 70).toFixed(2)} bts</span></td>
                     <td>${Number(l.precio_kg ?? 0).toLocaleString('es-CO')}</td>
                     <td><span className={`badge ${estadoBadge[l.estado] ?? 'badge-muted'}`}>{l.estado?.replace('_', ' ')}</span></td>
                   </tr>
@@ -181,7 +181,7 @@ function PortalOperador({ usuario, onLogout }: { usuario: UsuarioPortal; onLogou
                   <tr key={r.idregistro_proceso}>
                     <td><span className="badge badge-amber">{r.proceso?.nombre ?? '—'}</span></td>
                     <td><strong style={{ color: 'var(--text)' }}>{r.lote_cafe?.variedad ?? '—'}</strong></td>
-                    <td>{r.lote_cafe?.peso_kg ? <><strong style={{ color: 'var(--primary)' }}>{Number(r.lote_cafe.peso_kg).toLocaleString('es-CO')} kg</strong><br /><span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>{(r.lote_cafe.peso_kg / 70).toFixed(1)} bultos</span></> : '—'}</td>
+                    <td>{r.lote_cafe?.peso_kg ? <><strong style={{ color: 'var(--primary)', fontSize: '1rem' }}>{Number(r.lote_cafe.peso_kg).toLocaleString('es-CO')} kg</strong><br /><span style={{ fontSize: '0.8rem', color: 'var(--amber)', fontWeight: 700 }}>📦 {(r.lote_cafe.peso_kg / 70).toFixed(2)} bts</span></> : '—'}</td>
                     <td style={{ fontSize: '0.78rem' }}>{new Date(r.fecha_inicio).toLocaleDateString('es-CO')}</td>
                     <td style={{ fontSize: '0.78rem' }}>{new Date(r.fecha_fin).toLocaleDateString('es-CO')}</td>
                     <td style={{ fontSize: '0.76rem', maxWidth: 200 }}>{r.notas ? String(r.notas).slice(0, 60) + (r.notas.length > 60 ? '…' : '') : '—'}</td>
