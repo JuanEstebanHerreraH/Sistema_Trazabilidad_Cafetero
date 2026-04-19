@@ -122,9 +122,11 @@ export default function PortalCliente({ usuario }: { usuario: UsuarioPortal }) {
       )
       if (dErr) throw new Error(dErr.message)
 
+      const totalCOP = carrito.reduce((s, l) => s + l.cantidad * l.lote.precio_kg, 0)
       setCarrito([])
-      setExitoMsg(`✅ Compra #${ventaData.idventa} registrada — ${totalKg} kg por $${(totalKg * carrito[0].lote.precio_kg).toLocaleString('es-CO')} COP`)
-      setTimeout(() => { setExitoMsg(null); setTab('compras') }, 3500)
+      setExitoMsg(`✅ Compra #${ventaData.idventa} registrada — ${totalKg} kg por $${totalCOP.toLocaleString('es-CO')} COP`)
+      setTab('compras')
+      setTimeout(() => { setExitoMsg(null) }, 4000)
       await cargar()
     } catch (e: any) { setErrorCompra(e.message) }
     finally { setComprando(false) }
@@ -272,8 +274,19 @@ function LoteCard({ lote, enCarrito, onAgregar, onQuitar }: {
             <input type="number" className="form-input"
               value={cantidad} min={1} max={lote.peso_kg}
               onChange={e => setCantidad(Math.min(lote.peso_kg, Math.max(1, Number(e.target.value))))} />
-            <div style={{ fontSize: '0.69rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
-              Total: <strong>${(cantidad * (lote.precio_kg ?? 0)).toLocaleString('es-CO')}</strong> COP
+            <div style={{ background: 'var(--primary-subtle)', borderRadius: 'var(--r-md)', padding: '0.6rem 0.75rem', marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.18rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.76rem', color: 'var(--text-soft)' }}>
+                <span>Precio/kg:</span>
+                <span style={{ fontWeight: 600 }}>${(lote.precio_kg ?? 0).toLocaleString('es-CO')} COP</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.76rem', color: 'var(--text-soft)' }}>
+                <span>Equivale a:</span>
+                <span style={{ fontWeight: 600 }}>{(cantidad / 70).toFixed(2)} bultos <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>(1 bulto = 70 kg)</span></span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--border-soft)', paddingTop: '0.4rem', marginTop: '0.2rem' }}>
+                <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text)' }}>Total a pagar:</span>
+                <span style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--primary)' }}>${(cantidad * (lote.precio_kg ?? 0)).toLocaleString('es-CO')} COP</span>
+              </div>
             </div>
           </div>
           <div style={{ display: 'flex', gap: '0.5rem' }}>

@@ -41,7 +41,7 @@ export default function LotesPage() {
         movimiento_inventario(tipo, fecha_movimiento, cantidad, almacen_origen:idalmacen_origen(nombre), almacen_destino:idalmacen_destino(nombre), notas)
       `).eq('idlote_cafe', row.idlote_cafe).single(),
       supabase.from('venta').select(`
-        idventa, fecha_venta, cliente(nombre),
+        idventa, fecha_venta, cliente(nombre, email, telefono),
         detalle_venta!inner(cantidad, precio_venta)
       `).eq('detalle_venta.idlote_cafe', row.idlote_cafe),
     ])
@@ -181,9 +181,11 @@ export default function LotesPage() {
                     <div className="trace-title">Venta #{v.idventa}</div>
                     <div className="trace-date">{new Date(v.fecha_venta).toLocaleDateString('es-CO', { dateStyle: 'long' })}</div>
                     <div className="trace-detail">
-                      👤 {(v as any).cliente?.nombre ?? 'Cliente desconocido'}
+                      🧾 <strong>Comprador:</strong> {(v as any).cliente?.nombre ?? 'Cliente desconocido'}
+                      {(v as any).cliente?.email && <><br />📧 {(v as any).cliente.email}</>}
+                      {(v as any).cliente?.telefono && <><br />📞 {(v as any).cliente.telefono}</>}
                       {(v.detalle_venta ?? []).map((d: any, di: number) => (
-                        <span key={di}><br />· {d.cantidad} kg × ${Number(d.precio_venta).toLocaleString('es-CO')}/kg = ${(d.cantidad * d.precio_venta).toLocaleString('es-CO')}</span>
+                        <span key={di}><br />· {d.cantidad} kg × ${Number(d.precio_venta).toLocaleString('es-CO')}/kg = <strong>${(d.cantidad * d.precio_venta).toLocaleString('es-CO')}</strong></span>
                       ))}
                     </div>
                   </div>

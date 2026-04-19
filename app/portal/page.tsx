@@ -145,7 +145,8 @@ export default function PortalPage() {
         {rolNombre === 'Productor'     && <PortalProductor     usuario={usuario} />}
         {rolNombre === 'Catador'       && <PortalCatador       usuario={usuario} />}
         {rolNombre === 'Transportista' && <PortalTransportista usuario={usuario} />}
-        {!['Cliente','Productor','Catador','Transportista'].includes(rolNombre) && (
+        {(rolNombre === 'Operador' || rolNombre === 'Vendedor') && (() => { window.location.href = `/${rolNombre.toLowerCase()}`; return null })()}
+        {!['Cliente','Productor','Catador','Transportista','Operador','Vendedor'].includes(rolNombre) && (
           <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--text-soft)' }}>
             <div style={{ fontSize: '2rem', marginBottom: '0.75rem' }}>🔧</div>
             <p>Rol <strong>{rolNombre}</strong> no tiene portal configurado aún. Contacta al administrador.</p>
