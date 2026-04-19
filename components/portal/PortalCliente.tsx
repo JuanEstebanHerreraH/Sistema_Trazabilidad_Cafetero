@@ -2,6 +2,9 @@
 import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '../../utils/supabase/client'
 
+// ── Singleton: evita re-crear el client en cada render (causa loop infinito) ──
+const supabase = createClient()
+
 interface UsuarioPortal { idusuario: number; nombre: string; email: string }
 
 interface Lote {
@@ -19,7 +22,6 @@ interface VentaHistorial {
 }
 
 export default function PortalCliente({ usuario }: { usuario: UsuarioPortal }) {
-  const supabase = createClient()
   const [lotes, setLotes] = useState<Lote[]>([])
   const [ventas, setVentas] = useState<VentaHistorial[]>([])
   const [idCliente, setIdCliente] = useState<number | null>(null)
@@ -32,58 +34,47 @@ export default function PortalCliente({ usuario }: { usuario: UsuarioPortal }) {
   const [exitoMsg, setExitoMsg] = useState<string | null>(null)
 
   const cargar = useCallback(async () => {
-    // 1. Buscar cliente por email (campo único y confiable)
-    let { data: byEmail } = await supabase
-      .from('cliente').select('idcliente, email, nombre')
-      .eq('email', usuario.email)
-      .maybeSingle()
+    // ── 1. Obtener-o-crear cliente de forma atómica (upsert por email UNIQUE) ──
+    const { data: clienteRow, error: clienteErr } = await supabase
+      .from('cliente')
+      .upsert(
+        { nombre: usuario.nombre, email: usuario.email },
+        { onConflict: 'email' }
+      )
+      .select('idcliente')
+      .single()
 
-    let clienteId: number | null = byEmail?.idcliente ?? null
-
-    if (!clienteId) {
-      // Intentar por nombre como fallback
-      let { data: byNombre } = await supabase
-        .from('cliente').select('idcliente, email, nombre')
-        .eq('nombre', usuario.nombre)
-        .maybeSingle()
-
-      if (byNombre) {
-        clienteId = byNombre.idcliente
-        // Vincular email si falta
-        if (!byNombre.email) {
-          await supabase.from('cliente').update({ email: usuario.email }).eq('idcliente', clienteId)
-        }
-      } else {
-        // Crear nuevo cliente
-        const { data: nuevo } = await supabase.from('cliente')
-          .insert({ nombre: usuario.nombre, email: usuario.email })
-          .select('idcliente').single()
-        clienteId = (nuevo as any)?.idcliente ?? null
-      }
+    if (clienteErr || !clienteRow) {
+      console.warn('[PortalCliente] Error resolviendo cliente:', clienteErr?.message)
+      setLoading(false)
+      return
     }
 
+    const clienteId = clienteRow.idcliente
     setIdCliente(clienteId)
 
-    const [{ data: l }, { data: v }] = await Promise.all([
+    // ── 2. Cargar lotes disponibles + historial de compras en paralelo ──
+    const [lotesRes, ventasRes] = await Promise.all([
       supabase.from('lote_cafe').select(`
         idlote_cafe, variedad, fecha_cosecha, peso_kg, estado, precio_kg,
         finca(nombre, ubicacion, productor(nombre)),
         registro_proceso(proceso(nombre))
       `).eq('estado', 'disponible').gt('peso_kg', 0).order('fecha_cosecha', { ascending: false }),
 
-      clienteId
-        ? supabase.from('venta').select(`
-            idventa, fecha_venta, total_kg, precio_kg, notas,
-            detalle_venta(iddetalle_venta, cantidad, precio_venta,
-              lote_cafe:idlote_cafe(variedad, finca:idfinca(nombre)))
-          `).eq('idcliente', clienteId).order('fecha_venta', { ascending: false })
-        : Promise.resolve({ data: [] }),
+      supabase.from('venta').select(`
+        idventa, fecha_venta, total_kg, precio_kg, notas,
+        detalle_venta(iddetalle_venta, cantidad, precio_venta,
+          lote_cafe:idlote_cafe(variedad, finca:idfinca(nombre)))
+      `).eq('idcliente', clienteId).order('fecha_venta', { ascending: false }),
     ])
 
-    setLotes((l ?? []) as any)
-    setVentas((v ?? []) as any)
+    if (lotesRes.error) console.warn('[PortalCliente] Error cargando lotes:', lotesRes.error.message)
+    if (ventasRes.error) console.warn('[PortalCliente] Error cargando ventas:', ventasRes.error.message)
+
+    setLotes((lotesRes.data ?? []) as any)
+    setVentas((ventasRes.data ?? []) as any)
     setLoading(false)
-  }, [usuario.email, usuario.nombre, supabase])
+  }, [usuario.email, usuario.nombre])
 
   useEffect(() => { cargar() }, [cargar])
 
