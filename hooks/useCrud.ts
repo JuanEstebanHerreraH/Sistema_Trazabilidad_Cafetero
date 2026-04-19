@@ -46,3 +46,32 @@ export function useCrud(
 
   return { data, loading, error, insert, update, remove, refetch }
 }
+
+/**
+ * useRead — versión de solo lectura de useCrud.
+ * Usado por componentes que solo necesitan cargar datos para
+ * poblar selectores (ej: lista de productores en el form de Fincas).
+ */
+export function useRead(
+  table: string,
+  selectQuery = '*',
+  orderBy?: string
+) {
+  const [data, setData] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const refetch = useCallback(async () => {
+    setLoading(true)
+    let q = supabase.from(table).select(selectQuery)
+    if (orderBy) q = (q as any).order(orderBy)
+    const { data: rows, error: err } = await q
+    if (err) setError(err.message)
+    else { setData(rows ?? []); setError(null) }
+    setLoading(false)
+  }, [table, selectQuery, orderBy])
+
+  useEffect(() => { refetch() }, [refetch])
+
+  return { data, loading, error, refetch }
+}

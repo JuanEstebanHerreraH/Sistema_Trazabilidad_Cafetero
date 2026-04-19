@@ -50,7 +50,7 @@ export default function PortalCliente({ usuario }: { usuario: UsuarioPortal }) {
 
     const mainId = clienteRow?.idcliente ?? null
     setIdCliente(mainId)
-    const allIds = [...new Set((clienteRows ?? []).map(c => c.idcliente).concat(mainId ? [mainId] : []).filter(Boolean))]
+    const allIds = Array.from(new Set((clienteRows ?? []).map(c => c.idcliente).concat(mainId ? [mainId] : []).filter(Boolean)))
 
     const [{ data: l }, { data: v }] = await Promise.all([
       supabase.from('lote_cafe').select(`
@@ -223,7 +223,7 @@ function LoteCard({ lote, enCarrito, onAgregar, onQuitar }: {
 }) {
   const [abierto, setAbierto] = useState(false)
   const [cantidad, setCantidad] = useState(Math.min(50, lote.peso_kg))
-  const procesos = [...new Set(lote.registro_proceso?.map(r => r.proceso?.nombre).filter(Boolean))]
+  const procesos = Array.from(new Set(lote.registro_proceso?.map(r => r.proceso?.nombre).filter(Boolean)))
 
   return (
     <div className={`lote-card${enCarrito ? ' in-cart' : ''}`}>

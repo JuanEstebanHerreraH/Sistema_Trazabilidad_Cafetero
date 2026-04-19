@@ -154,7 +154,7 @@ export default function SolicitudesRol() {
     rechazado: solicitudes.filter(s => s.estado_revision === 'rechazado').length,
   }
 
-  const rolesUnicos = [...new Set(solicitudes.map(s => s.tipo_rol))]
+  const rolesUnicos = Array.from(new Set(solicitudes.map(s => s.tipo_rol)))
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
