@@ -146,6 +146,10 @@ CREATE INDEX IF NOT EXISTS idx_usuario_auth_uid    ON public.usuario(auth_uid);
 CREATE INDEX IF NOT EXISTS idx_usuario_email       ON public.usuario(email);
 
 -- ── 10. CORREGIR CLIENTES SIN EMAIL ─────────────────────────────────────────
+-- Asegurar que la columna existe antes de usarla
+ALTER TABLE public.cliente ADD COLUMN IF NOT EXISTS email TEXT;
+ALTER TABLE public.cliente ADD COLUMN IF NOT EXISTS telefono TEXT;
+
 -- Vincular clientes de la tabla pública con sus emails de la tabla usuario
 UPDATE public.cliente c
 SET email = u.email

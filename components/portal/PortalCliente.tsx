@@ -32,6 +32,7 @@ export default function PortalCliente({ usuario }: { usuario: UsuarioPortal }) {
   const [comprando, setComprando] = useState(false)
   const [errorCompra, setErrorCompra] = useState<string | null>(null)
   const [exitoMsg, setExitoMsg] = useState<string | null>(null)
+  const [errorLotes, setErrorLotes] = useState<string | null>(null)
 
   const cargar = useCallback(async () => {
     // ── 1. Obtener-o-crear cliente (Resiliente a duplicados si no se ha corrido el SQL) ──
@@ -85,7 +86,12 @@ export default function PortalCliente({ usuario }: { usuario: UsuarioPortal }) {
         : Promise.resolve({ data: [], error: null }),
     ])
 
-    if (lotesRes.error) console.warn('[PortalCliente] Error cargando lotes:', lotesRes.error.message)
+    if (lotesRes.error) {
+      console.warn('[PortalCliente] Error cargando lotes:', lotesRes.error.message)
+      setErrorLotes(lotesRes.error.message)
+    } else {
+      setErrorLotes(null)
+    }
     if (ventasRes.error) console.warn('[PortalCliente] Error cargando ventas:', ventasRes.error.message)
 
     setLotes((lotesRes.data ?? []) as any)
@@ -106,7 +112,11 @@ export default function PortalCliente({ usuario }: { usuario: UsuarioPortal }) {
   const quitarCarrito = (id: number) => setCarrito(prev => prev.filter(l => l.lote.idlote_cafe !== id))
 
   const confirmarCompra = async () => {
-    if (!idCliente || carrito.length === 0) return
+    if (carrito.length === 0) return
+    if (!idCliente) {
+      setErrorCompra('No se pudo identificar tu cuenta de cliente. Recarga la página e intenta de nuevo.')
+      return
+    }
     setComprando(true); setErrorCompra(null)
     try {
       // Verificar stock actualizado antes de insertar
@@ -215,7 +225,14 @@ export default function PortalCliente({ usuario }: { usuario: UsuarioPortal }) {
               placeholder="🔍 Buscar por variedad, finca o productor…"
               value={filtro} onChange={e => setFiltro(e.target.value)} />
           </div>
-          {lotesFiltrados.length === 0 ? (
+          {errorLotes ? (
+            <div className="alert alert-error" style={{ marginTop: '1rem' }}>
+              <strong>⚠ Error al cargar lotes:</strong> {errorLotes}
+              <div style={{ marginTop: '0.5rem', fontSize: '0.78rem', color: 'var(--text-soft)' }}>
+                Verifica en Supabase que la columna <code>precio_kg</code> existe en <code>lote_cafe</code> y que la migración <code>migration_precio_kg.sql</code> fue ejecutada.
+              </div>
+            </div>
+          ) : lotesFiltrados.length === 0 ? (
             <div className="empty-state"><div className="empty-icon">☕</div><p>No hay lotes disponibles.</p></div>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))', gap: '1rem' }}>

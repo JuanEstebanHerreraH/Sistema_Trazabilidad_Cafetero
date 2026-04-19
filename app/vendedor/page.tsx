@@ -42,8 +42,11 @@ export default function VendedorPage() {
   return <PortalVendedor usuario={usuario} onLogout={handleLogout} />
 }
 
+// ── Singleton para evitar re-renders infinitos ──
+const supabaseVendedor = createClient()
+
 function PortalVendedor({ usuario, onLogout }: { usuario: UsuarioPortal; onLogout: () => void }) {
-  const supabase = createClient()
+  const supabase = supabaseVendedor
   const [tab, setTab] = useState<'ventas' | 'lotes' | 'clientes'>('ventas')
   const [ventas, setVentas] = useState<any[]>([])
   const [lotes, setLotes] = useState<any[]>([])
