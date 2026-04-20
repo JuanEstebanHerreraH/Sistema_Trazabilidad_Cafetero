@@ -37,16 +37,18 @@ interface CrudPageProps {
   fields: Field[]
   searchKey?: string
   extraActions?: (row: any) => ReactNode
+  filterSelects?: { key: string; label: string; options: { value: string; label: string }[] }[]
 }
 
 export default function CrudPage({
   title, subtitle, icon, table, idField,
   selectQuery = '*', orderBy, columns, fields,
-  searchKey, extraActions,
+  searchKey, extraActions, filterSelects,
 }: CrudPageProps) {
   const { data, loading, error, insert, update, remove } = useCrud(table, idField, selectQuery, orderBy)
 
   const [search, setSearch] = useState('')
+  const [filterValues, setFilterValues] = useState<Record<string, string>>({})
   const [modalOpen, setModalOpen] = useState(false)
   const [viewModal, setViewModal] = useState(false)
   const [viewRecord, setViewRecord] = useState<any>(null)
@@ -60,10 +62,21 @@ export default function CrudPage({
   const dataFields = useMemo(() => fields.filter(f => !!f.key), [fields])
 
   const filtered = useMemo(() => {
-    if (!search || !searchKey) return data
-    const q = search.toLowerCase()
-    return data.filter(row => String(row[searchKey] ?? '').toLowerCase().includes(q))
-  }, [data, search, searchKey])
+    let result = data
+    if (search && searchKey) {
+      const q = search.toLowerCase()
+      result = result.filter(row => String(row[searchKey] ?? '').toLowerCase().includes(q))
+    }
+    if (filterSelects) {
+      filterSelects.forEach(fs => {
+        const val = filterValues[fs.key]
+        if (val && val !== '') {
+          result = result.filter(row => String(row[fs.key] ?? '') === val)
+        }
+      })
+    }
+    return result
+  }, [data, search, searchKey, filterValues, filterSelects])
 
   const openCreate = () => {
     const defaults: Record<string, any> = {}
@@ -192,6 +205,14 @@ export default function CrudPage({
               onChange={e => setSearch(e.target.value)} />
           </div>
         )}
+        {filterSelects?.map(fs => (
+          <select key={fs.key} className="form-select" style={{ flex: '0 0 auto', minWidth: 140 }}
+            value={filterValues[fs.key] ?? ''}
+            onChange={e => setFilterValues(p => ({ ...p, [fs.key]: e.target.value }))}>
+            <option value="">Todos: {fs.label}</option>
+            {fs.options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+        ))}
         <span className="toolbar-count">{filtered.length} registro{filtered.length !== 1 ? 's' : ''}</span>
       </div>
 

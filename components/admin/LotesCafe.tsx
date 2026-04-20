@@ -67,6 +67,9 @@ export default function LotesCafe() {
       ]}
       fields={fields}
       searchKey="variedad"
+      filterSelects={[
+        { key: 'estado', label: 'Estado', options: ESTADOS.map(e => ({ value: e.value, label: e.label })) }
+      ]}
     />
   )
 }

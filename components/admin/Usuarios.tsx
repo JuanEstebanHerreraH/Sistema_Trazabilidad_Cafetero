@@ -38,7 +38,6 @@ export default function Usuarios() {
     <CrudPage
       title="Usuarios" subtitle="Usuarios del sistema" icon="👥"
       table="usuario" idField="idusuario"
-      /* ✅ "!idrol" especifica explícitamente la columna del JOIN para evitar ambigüedad */
       selectQuery="*, rol!usuario_idrol_fkey(nombre)"
       orderBy="nombre"
       columns={[
@@ -64,6 +63,14 @@ export default function Usuarios() {
       ]}
       fields={fields}
       searchKey="nombre"
+      filterSelects={[
+        { key: 'idrol', label: 'Rol', options: roles.map(r => ({ value: String(r.idrol), label: r.nombre })) },
+        { key: 'estado_aprobacion', label: 'Estado', options: [
+          { value: 'aprobado', label: '✅ Aprobado' },
+          { value: 'pendiente', label: '⏳ Pendiente' },
+          { value: 'rechazado', label: '❌ Rechazado' },
+        ]},
+      ]}
     />
   )
 }

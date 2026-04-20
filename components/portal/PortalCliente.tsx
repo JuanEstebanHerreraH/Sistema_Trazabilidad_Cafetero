@@ -414,6 +414,8 @@ function CarritoView({ carrito, totalKg, totalCOP, onQuitar, onConfirmar, compra
 
 // ── Historial de compras ──────────────────────────────────────────────────────
 function HistorialCompras({ ventas, onVerCatalogo }: { ventas: VentaHistorial[]; onVerCatalogo: () => void }) {
+  const [expandido, setExpandido] = useState<number | null>(null)
+
   if (ventas.length === 0) return (
     <div className="empty-state">
       <div className="empty-icon">📦</div>
@@ -421,41 +423,71 @@ function HistorialCompras({ ventas, onVerCatalogo }: { ventas: VentaHistorial[];
       <button className="btn btn-primary" style={{ marginTop: '0.75rem' }} onClick={onVerCatalogo}>Ver catálogo</button>
     </div>
   )
+
+  const totalKg  = ventas.reduce((s, v) => s + (v.total_kg ?? 0), 0)
+  const totalCOP = ventas.reduce((s, v) => s + ((v.total_kg ?? 0) * (v.precio_kg ?? 0)), 0)
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-      {ventas.map(v => (
-        <div key={v.idventa} className="venta-card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.6rem' }}>
-            <div>
-              <div style={{ fontWeight: 700, color: 'var(--text)', fontSize: '0.92rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                Compra #{v.idventa}
-                <span className="badge badge-green">✓ Completada</span>
-              </div>
-              <div style={{ color: 'var(--text-dim)', fontSize: '0.76rem', marginTop: '0.1rem' }}>
-                {new Date(v.fecha_venta).toLocaleDateString('es-CO', { dateStyle: 'long' })}
-              </div>
-            </div>
-            <div style={{ textAlign: 'right' }}>
-              {v.total_kg && <>
-                <div style={{ fontWeight: 700, color: 'var(--primary)', fontSize: '1rem' }}>{v.total_kg} kg</div>
-                <div style={{ fontSize: '0.78rem', color: 'var(--amber)', fontWeight: 700 }}>📦 {(v.total_kg / 70).toFixed(2)} bultos</div>
-                {v.precio_kg && <div style={{ color: 'var(--text-dim)', fontSize: '0.76rem' }}>${(v.total_kg * v.precio_kg).toLocaleString('es-CO')} COP</div>}
-              </>}
-            </div>
+    <div>
+      {/* Resumen compacto */}
+      <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
+        {[
+          { label: 'Compras', val: ventas.length, color: 'var(--primary)' },
+          { label: 'Total kg', val: `${totalKg.toLocaleString('es-CO')} kg`, color: 'var(--green)' },
+          { label: 'Total pagado', val: `$${totalCOP.toLocaleString('es-CO')}`, color: 'var(--amber)' },
+        ].map(s => (
+          <div key={s.label} style={{ background: 'var(--bg-card)', border: '1px solid var(--border-soft)', borderRadius: 'var(--r-lg)', padding: '0.6rem 1rem', flex: '1 1 120px', minWidth: 110 }}>
+            <div style={{ fontSize: '0.62rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', marginBottom: '0.15rem' }}>{s.label}</div>
+            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1rem', color: s.color }}>{s.val}</div>
           </div>
-          {(v.detalle_venta ?? []).length > 0 && (
-            <div style={{ borderTop: '1px solid var(--border-soft)', paddingTop: '0.6rem', display: 'flex', flexDirection: 'column', gap: '0.28rem' }}>
-              {v.detalle_venta.map(d => (
-                <div key={d.iddetalle_venta} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.79rem', color: 'var(--text-soft)' }}>
-                  <span>☕ {d.lote_cafe?.variedad ?? '—'}{d.lote_cafe?.finca ? ` · ${d.lote_cafe.finca.nombre}` : ''}</span>
-                  <span style={{ fontWeight: 600 }}>{d.cantidad} kg — ${(d.cantidad * d.precio_venta).toLocaleString('es-CO')}</span>
+        ))}
+      </div>
+
+      {/* Tabla compacta con acordeón */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+        {ventas.map(v => {
+          const abierto = expandido === v.idventa
+          const totalV  = (v.total_kg ?? 0) * (v.precio_kg ?? 0)
+          return (
+            <div key={v.idventa} style={{ background: 'var(--bg-card)', border: '1px solid var(--border-soft)', borderRadius: 'var(--r-lg)', overflow: 'hidden', transition: 'border-color 0.2s' }}>
+              {/* Fila principal — siempre visible */}
+              <button
+                onClick={() => setExpandido(abierto ? null : v.idventa)}
+                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.65rem 1rem', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left' }}
+              >
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', minWidth: 28 }}>#{v.idventa}</span>
+                <span className="badge badge-green" style={{ fontSize: '0.64rem', padding: '0.15rem 0.5rem' }}>✓</span>
+                <span style={{ flex: 1, fontSize: '0.82rem', color: 'var(--text-soft)' }}>
+                  {new Date(v.fecha_venta).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })}
+                </span>
+                {v.total_kg && (
+                  <span style={{ fontWeight: 700, color: 'var(--primary)', fontSize: '0.88rem' }}>{v.total_kg} kg</span>
+                )}
+                {totalV > 0 && (
+                  <span style={{ color: 'var(--text-soft)', fontSize: '0.8rem', minWidth: 90, textAlign: 'right' }}>${totalV.toLocaleString('es-CO')}</span>
+                )}
+                <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginLeft: '0.25rem' }}>{abierto ? '▲' : '▼'}</span>
+              </button>
+
+              {/* Detalle expandible */}
+              {abierto && (
+                <div style={{ borderTop: '1px solid var(--border-soft)', padding: '0.6rem 1rem 0.75rem' }}>
+                  {(v.detalle_venta ?? []).map(d => (
+                    <div key={d.iddetalle_venta} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.3rem 0', fontSize: '0.8rem', borderBottom: '1px solid var(--border-soft)' }}>
+                      <span style={{ color: 'var(--text-soft)' }}>
+                        ☕ <strong style={{ color: 'var(--text)' }}>{d.lote_cafe?.variedad ?? '—'}</strong>
+                        {d.lote_cafe?.finca ? <span style={{ color: 'var(--text-dim)' }}> · {d.lote_cafe.finca.nombre}</span> : null}
+                      </span>
+                      <span style={{ fontWeight: 600, color: 'var(--text-soft)' }}>{d.cantidad} kg — ${(d.cantidad * d.precio_venta).toLocaleString('es-CO')}</span>
+                    </div>
+                  ))}
+                  {v.notas && <div style={{ marginTop: '0.4rem', fontSize: '0.73rem', color: 'var(--text-muted)' }}>📝 {v.notas}</div>}
                 </div>
-              ))}
+              )}
             </div>
-          )}
-          {v.notas && <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginTop: '0.4rem' }}>📝 {v.notas}</div>}
-        </div>
-      ))}
+          )
+        })}
+      </div>
     </div>
   )
 }

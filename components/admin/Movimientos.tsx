@@ -241,15 +241,19 @@ export default function Movimientos() {
     await cargar()
   }
 
+  // Toolbar
+  const [filtroTipo, setFiltroTipo] = useState('')
+
   const filtered = data.filter(row => {
-    if (!search) return true
     const q = search.toLowerCase()
-    return (
+    const matchSearch = !search || (
       row.tipo?.toLowerCase().includes(q) ||
       row.lote_cafe?.variedad?.toLowerCase().includes(q) ||
       row.almacen_origen?.nombre?.toLowerCase().includes(q) ||
       row.almacen_destino?.nombre?.toLowerCase().includes(q)
     )
+    const matchTipo = !filtroTipo || row.tipo === filtroTipo
+    return matchSearch && matchTipo
   })
 
   // Format almacen option with stock info
@@ -282,8 +286,15 @@ export default function Movimientos() {
       <div className="toolbar">
         <div className="toolbar-search">
           <span className="search-icon">🔍</span>
-          <input type="text" placeholder="Buscar por tipo, lote, almacén…" value={search} onChange={e => setSearch(e.target.value)} />
+          <input type="text" placeholder="Buscar por lote, almacén…" value={search} onChange={e => setSearch(e.target.value)} />
         </div>
+        <select className="form-select" style={{ flex: '0 0 auto', minWidth: 150 }}
+          value={filtroTipo} onChange={e => setFiltroTipo(e.target.value)}>
+          <option value="">Todos los tipos</option>
+          <option value="entrada">📥 Entrada</option>
+          <option value="salida">📤 Salida</option>
+          <option value="traslado">🔄 Traslado</option>
+        </select>
         <span className="toolbar-count">{filtered.length} registro{filtered.length !== 1 ? 's' : ''}</span>
       </div>
 
