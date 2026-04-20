@@ -67,6 +67,18 @@ export default function LotesCafe() {
       ]}
       fields={fields}
       searchKey="variedad"
+      filterKeys={[
+        {
+          key: 'estado',
+          label: 'Estado',
+          options: [
+            { value: 'disponible',  label: '✅ Disponible'  },
+            { value: 'en_proceso',  label: '⚙ En proceso'  },
+            { value: 'vendido',     label: '💰 Vendido'     },
+            { value: 'exportado',   label: '✈ Exportado'   },
+          ],
+        },
+      ]}
     />
   )
 }

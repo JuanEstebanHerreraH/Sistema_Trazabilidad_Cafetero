@@ -195,7 +195,7 @@ export default function SolicitudesRol() {
       </div>
 
       {/* ── Barra de filtros ── */}
-      <div className="toolbar" style={{ flexWrap: 'wrap', gap: '0.6rem', marginBottom: '1rem' }}>
+      <div className="toolbar-v2" style={{ marginBottom: '0.6rem' }}>
         <div className="toolbar-search" style={{ flex: '1 1 200px' }}>
           <span className="search-icon">🔍</span>
           <input
@@ -205,32 +205,48 @@ export default function SolicitudesRol() {
             onChange={e => setBusqueda(e.target.value)}
           />
         </div>
-
-        <select
-          className="form-select"
-          style={{ flex: '0 0 auto', minWidth: '140px' }}
-          value={filtroEstado}
-          onChange={e => setFiltroEstado(e.target.value)}
-        >
-          <option value="todos">Todos los estados</option>
-          <option value="pendiente">Pendiente</option>
-          <option value="aprobado">Aprobado</option>
-          <option value="rechazado">Rechazado</option>
-        </select>
-
-        <select
-          className="form-select"
-          style={{ flex: '0 0 auto', minWidth: '140px' }}
-          value={filtroRol}
-          onChange={e => setFiltroRol(e.target.value)}
-        >
-          <option value="todos">Todos los roles</option>
-          {rolesUnicos.map(r => (
-            <option key={r} value={r}>{r}</option>
-          ))}
-        </select>
-
+        {(busqueda || filtroEstado !== 'todos' || filtroRol !== 'todos') && (
+          <button className="filter-clear" onClick={() => { setBusqueda(''); setFiltroEstado('todos'); setFiltroRol('todos') }}>
+            ✕ Limpiar
+          </button>
+        )}
         <span className="toolbar-count">{filtradas.length} solicitud{filtradas.length !== 1 ? 'es' : ''}</span>
+      </div>
+
+      <div className="filter-bar" style={{ marginBottom: '1rem' }}>
+        <div className="filter-row">
+          <span className="filter-label">Estado</span>
+          <div className="filter-chips">
+            {[
+              { v: 'todos',     l: 'Todos' },
+              { v: 'pendiente', l: '⏳ Pendiente' },
+              { v: 'aprobado',  l: '✅ Aprobado' },
+              { v: 'rechazado', l: '❌ Rechazado' },
+            ].map(opt => (
+              <button key={opt.v}
+                className={`filter-chip${filtroEstado === opt.v ? ' active' : ''}`}
+                onClick={() => setFiltroEstado(opt.v)}>
+                {opt.l}
+              </button>
+            ))}
+          </div>
+        </div>
+        {rolesUnicos.length > 0 && (
+          <div className="filter-row">
+            <span className="filter-label">Rol</span>
+            <div className="filter-chips">
+              <button className={`filter-chip${filtroRol === 'todos' ? ' active' : ''}`}
+                onClick={() => setFiltroRol('todos')}>Todos</button>
+              {rolesUnicos.map(r => (
+                <button key={r}
+                  className={`filter-chip${filtroRol === r ? ' active' : ''}`}
+                  onClick={() => setFiltroRol(r)}>
+                  {r}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ── Tabla / Lista ── */}

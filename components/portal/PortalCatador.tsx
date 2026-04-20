@@ -1,54 +1,223 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { createClient } from '../../utils/supabase/client'
 
 interface UsuarioPortal { idusuario: number; nombre: string; email: string }
+
+const PAGE_SIZE = 12
 
 export default function PortalCatador({ usuario }: { usuario: UsuarioPortal }) {
   const supabase = createClient()
   const [registros, setRegistros] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
+  const [busqueda, setBusqueda] = useState('')
+  const [filtroProceso, setFiltroProceso] = useState('')
+  const [showFilters, setShowFilters] = useState(false)
+  const [page, setPage] = useState(1)
+
   useEffect(() => {
     supabase.from('registro_proceso').select(`
       idregistro_proceso, fecha_inicio, fecha_fin, notas,
       lote_cafe:idlote_cafe(variedad, peso_kg, finca:idfinca(nombre)),
       proceso:idproceso(nombre)
-    `).order('fecha_inicio', { ascending: false }).limit(50)
+    `).order('fecha_inicio', { ascending: false })
       .then(({ data }) => { setRegistros(data ?? []); setLoading(false) })
   }, [supabase])
+
+  const procesosUnicos = useMemo(() =>
+    Array.from(new Set(registros.map(r => r.proceso?.nombre).filter(Boolean))), [registros])
+
+  const filtrados = useMemo(() => {
+    let rows = registros
+    if (busqueda) {
+      const q = busqueda.toLowerCase()
+      rows = rows.filter(r =>
+        (r.lote_cafe?.variedad ?? '').toLowerCase().includes(q) ||
+        (r.lote_cafe?.finca?.nombre ?? '').toLowerCase().includes(q) ||
+        (r.proceso?.nombre ?? '').toLowerCase().includes(q)
+      )
+    }
+    if (filtroProceso) rows = rows.filter(r => r.proceso?.nombre === filtroProceso)
+    return rows
+  }, [registros, busqueda, filtroProceso])
+
+  const totalPages = Math.max(1, Math.ceil(filtrados.length / PAGE_SIZE))
+  const paginated  = filtrados.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+
+  const diffDias = (r: any) => {
+    if (!r.fecha_inicio || !r.fecha_fin) return null
+    const h = (new Date(r.fecha_fin).getTime() - new Date(r.fecha_inicio).getTime()) / 36e5
+    return h < 24 ? `${Math.round(h)}h` : `${Math.round(h / 24)}d`
+  }
 
   return (
     <div>
       <div style={{ marginBottom: '1.5rem' }}>
-        <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.6rem', color: 'var(--text)', marginBottom: '0.2rem' }}>Portal Catador</h1>
-        <p style={{ color: 'var(--text-dim)', fontSize: '0.84rem' }}>Registros de procesos de beneficio para evaluación.</p>
+        <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.6rem', color: 'var(--text)', marginBottom: '0.2rem' }}>
+          Portal Catador
+        </h1>
+        <p style={{ color: 'var(--text-dim)', fontSize: '0.84rem' }}>
+          Registros de procesos de beneficio para evaluación.
+        </p>
+      </div>
+
+      {/* Stats */}
+      <div className="stats-grid" style={{ marginBottom: '1.5rem' }}>
+        {[
+          { icon: '📋', label: 'Total registros', val: registros.length,              color: 'var(--primary)' },
+          { icon: '🔬', label: 'Procesos únicos', val: procesosUnicos.length,         color: 'var(--blue)' },
+          { icon: '☕', label: 'Lotes evaluados', val: new Set(registros.map(r => r.lote_cafe?.variedad)).size, color: 'var(--amber)' },
+        ].map(s => (
+          <div key={s.label} className="stat-card" style={{ '--accent': s.color } as any}>
+            <div className="stat-icon">{s.icon}</div>
+            <div className="stat-value">{s.val}</div>
+            <div className="stat-label">{s.label}</div>
+          </div>
+        ))}
       </div>
 
       {loading ? (
         <div className="loading-center"><div className="spinner" /><span>Cargando…</span></div>
       ) : registros.length === 0 ? (
-        <div className="empty-state"><div className="empty-icon">🔬</div><p>No hay registros de proceso disponibles.</p></div>
-      ) : (
-        <div className="data-table-wrap table-responsive">
-          <table className="data-table">
-            <thead>
-              <tr><th>Proceso</th><th>Lote</th><th>Finca</th><th>Inicio</th><th>Fin</th><th>Notas</th></tr>
-            </thead>
-            <tbody>
-              {registros.map((r: any) => (
-                <tr key={r.idregistro_proceso}>
-                  <td><span className="badge badge-amber">{r.proceso?.nombre ?? '—'}</span></td>
-                  <td><strong style={{ color: 'var(--text)' }}>{r.lote_cafe?.variedad ?? '—'}</strong></td>
-                  <td>{r.lote_cafe?.finca?.nombre ?? '—'}</td>
-                  <td style={{ fontSize: '0.78rem' }}>{new Date(r.fecha_inicio).toLocaleDateString('es-CO')}</td>
-                  <td style={{ fontSize: '0.78rem' }}>{new Date(r.fecha_fin).toLocaleDateString('es-CO')}</td>
-                  <td style={{ fontSize: '0.78rem', maxWidth: 200 }}>{r.notas ? String(r.notas).slice(0, 60) + (r.notas.length > 60 ? '…' : '') : '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="empty-state">
+          <div className="empty-icon">🔬</div>
+          <p>No hay registros de proceso disponibles.</p>
         </div>
+      ) : (
+        <>
+          {/* Toolbar */}
+          <div className="toolbar-v2">
+            <div className="toolbar-search" style={{ flex: 1, minWidth: 180 }}>
+              <span className="search-icon">🔍</span>
+              <input type="text" placeholder="Buscar variedad, finca o proceso…"
+                value={busqueda} onChange={e => { setBusqueda(e.target.value); setPage(1) }} />
+            </div>
+            {procesosUnicos.length > 0 && (
+              <button className="btn btn-secondary btn-sm"
+                onClick={() => setShowFilters(v => !v)}
+                style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                ⚙ Filtros
+                {filtroProceso && <span className="filter-badge">1</span>}
+              </button>
+            )}
+            {(busqueda || filtroProceso) && (
+              <button className="filter-clear" onClick={() => { setBusqueda(''); setFiltroProceso(''); setPage(1) }}>
+                ✕ Limpiar
+              </button>
+            )}
+            <span className="toolbar-count">{filtrados.length} registro{filtrados.length !== 1 ? 's' : ''}</span>
+          </div>
+
+          {showFilters && procesosUnicos.length > 0 && (
+            <div className="filter-bar">
+              <div className="filter-row">
+                <span className="filter-label">Proceso</span>
+                <div className="filter-chips">
+                  <button className={`filter-chip${filtroProceso === '' ? ' active' : ''}`}
+                    onClick={() => { setFiltroProceso(''); setPage(1) }}>Todos</button>
+                  {procesosUnicos.map(p => (
+                    <button key={p}
+                      className={`filter-chip chip-amber${filtroProceso === p ? ' active' : ''}`}
+                      onClick={() => { setFiltroProceso(p); setPage(1) }}>
+                      {p}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {filtrados.length === 0 ? (
+            <div className="empty-state">
+              <div className="empty-icon">🔍</div>
+              <p>Sin registros con esos filtros.</p>
+              <button className="btn btn-secondary btn-sm" style={{ marginTop: '0.75rem' }}
+                onClick={() => { setBusqueda(''); setFiltroProceso(''); setPage(1) }}>
+                Limpiar filtros
+              </button>
+            </div>
+          ) : (
+            <>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '0.85rem' }}>
+                {paginated.map((r: any) => {
+                  const dur = diffDias(r)
+                  return (
+                    <div key={r.idregistro_proceso} className="record-card">
+                      <div className="record-card-header">
+                        <div>
+                          <div className="record-card-title">☕ {r.lote_cafe?.variedad ?? '—'}</div>
+                          <div className="record-card-meta">🌿 {r.lote_cafe?.finca?.nombre ?? '—'}</div>
+                        </div>
+                        <span className="badge badge-amber">{r.proceso?.nombre ?? '—'}</span>
+                      </div>
+                      <div className="record-card-body">
+                        <div className="record-field">
+                          <span className="record-field-label">Inicio</span>
+                          <span className="record-field-value">
+                            {new Date(r.fecha_inicio).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })}
+                          </span>
+                        </div>
+                        <div className="record-field">
+                          <span className="record-field-label">Fin</span>
+                          <span className="record-field-value">
+                            {r.fecha_fin ? new Date(r.fecha_fin).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
+                          </span>
+                        </div>
+                        {dur && (
+                          <div className="record-field">
+                            <span className="record-field-label">Duración</span>
+                            <span className="record-field-value" style={{ color: 'var(--blue)' }}>{dur}</span>
+                          </div>
+                        )}
+                        {r.lote_cafe?.peso_kg && (
+                          <div className="record-field">
+                            <span className="record-field-label">Peso lote</span>
+                            <span className="record-field-value">{r.lote_cafe.peso_kg} kg</span>
+                          </div>
+                        )}
+                      </div>
+                      {r.notas && (
+                        <div style={{
+                          marginTop: '0.65rem', paddingTop: '0.6rem',
+                          borderTop: '1px solid var(--border-soft)',
+                          fontSize: '0.77rem', color: 'var(--text-dim)', lineHeight: 1.5,
+                        }}>
+                          📝 {String(r.notas).slice(0, 120)}{r.notas.length > 120 ? '…' : ''}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+
+              {totalPages > 1 && (
+                <div className="pagination-bar">
+                  <div className="pagination-info">
+                    {(page - 1) * PAGE_SIZE + 1}–{Math.min(filtrados.length, page * PAGE_SIZE)} de {filtrados.length}
+                  </div>
+                  <div className="pagination-controls">
+                    <button className="page-btn page-btn-wide" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>← Ant</button>
+                    {Array.from({ length: totalPages }, (_, i) => i + 1)
+                      .filter(p => p === 1 || p === totalPages || Math.abs(p - page) <= 1)
+                      .reduce<(number | '…')[]>((acc, p, i, arr) => {
+                        if (i > 0 && (p as number) - (arr[i - 1] as number) > 1) acc.push('…')
+                        acc.push(p)
+                        return acc
+                      }, [])
+                      .map((p, i) =>
+                        p === '…'
+                          ? <span key={`e${i}`} className="page-ellipsis">…</span>
+                          : <button key={p} className={`page-btn${page === p ? ' active' : ''}`}
+                              onClick={() => setPage(p as number)}>{p}</button>
+                      )}
+                    <button className="page-btn page-btn-wide" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>Sig →</button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </>
       )}
     </div>
   )

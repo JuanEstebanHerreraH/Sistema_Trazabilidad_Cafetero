@@ -2,16 +2,6 @@
 import { useRead } from '../../hooks/useCrud'
 import CrudPage from '../../components/CrudPage'
 
-/**
- * Componente Usuarios — v2
- *
- * FIX: Se usa "rol!usuario_idrol_fkey(nombre)" en lugar de "rol(nombre)"
- * porque la migración v2 agregó una segunda FK (rol_solicitado → rol),
- * lo que causaba ambigüedad en PostgREST de Supabase:
- *   "Could not embed because more than one relationship was found for 'usuario' and 'rol'"
- *
- * La sintaxis "!idrol" le dice a PostgREST qué columna usar para el JOIN.
- */
 export default function Usuarios() {
   const { data: roles } = useRead('rol', 'idrol, nombre', 'nombre')
 
@@ -38,13 +28,12 @@ export default function Usuarios() {
     <CrudPage
       title="Usuarios" subtitle="Usuarios del sistema" icon="👥"
       table="usuario" idField="idusuario"
-      /* ✅ "!idrol" especifica explícitamente la columna del JOIN para evitar ambigüedad */
       selectQuery="*, rol!usuario_idrol_fkey(nombre)"
       orderBy="nombre"
       columns={[
-        { key: 'idusuario',        label: '#' },
-        { key: 'nombre',           label: 'Nombre' },
-        { key: 'email',            label: 'Email' },
+        { key: 'idusuario', label: '#' },
+        { key: 'nombre',    label: 'Nombre' },
+        { key: 'email',     label: 'Email' },
         {
           key: 'idrol', label: 'Rol',
           render: (_, r) => r.rol?.nombre ?? <span style={{ color: 'var(--text-muted)' }}>Sin rol</span>
@@ -64,6 +53,23 @@ export default function Usuarios() {
       ]}
       fields={fields}
       searchKey="nombre"
+      filterKeys={[
+        {
+          key: 'estado_aprobacion',
+          label: 'Estado',
+          options: [
+            { value: 'aprobado',  label: '✅ Aprobados'  },
+            { value: 'pendiente', label: '⏳ Pendientes' },
+            { value: 'rechazado', label: '❌ Rechazados' },
+          ],
+        },
+        {
+          key: 'rol',
+          label: 'Rol',
+          resolve: (row) => row.rol?.nombre ?? '',
+          options: roles.map(r => ({ value: r.nombre, label: r.nombre })),
+        },
+      ]}
     />
   )
 }

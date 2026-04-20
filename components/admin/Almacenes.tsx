@@ -187,11 +187,14 @@ export default function Almacenes() {
       </div>
 
       {/* Toolbar */}
-      <div className="toolbar">
-        <div className="toolbar-search">
+      <div className="toolbar-v2">
+        <div className="toolbar-search" style={{ flex: 1 }}>
           <span className="search-icon">🔍</span>
           <input type="text" placeholder="Buscar…" value={search} onChange={e => setSearch(e.target.value)} />
         </div>
+        {search && (
+          <button className="filter-clear" onClick={() => setSearch('')}>✕ Limpiar</button>
+        )}
         <span className="toolbar-count">{filtered.length} registro{filtered.length !== 1 ? 's' : ''}</span>
       </div>
 

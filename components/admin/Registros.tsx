@@ -62,6 +62,14 @@ export default function Registros() {
         { key: 'idusuario',    label: 'Responsable', render: (_, r) => r.usuario?.nombre || '—' },
       ]}
       fields={fields}
+      filterKeys={[
+        {
+          key: 'proceso',
+          label: 'Proceso',
+          resolve: (row) => row.proceso?.nombre ?? '',
+          options: procesos.map(p => ({ value: p.nombre, label: p.nombre })),
+        },
+      ]}
     />
   )
 }
