@@ -25,8 +25,6 @@ export default function Almacenes() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
-  const [filtroOcupacion, setFiltroOcupacion] = useState('')
-  const [showOcupFilter, setShowOcupFilter] = useState(false)
 
   // Modal crear/editar
   const [modalOpen, setModalOpen] = useState(false)
@@ -130,17 +128,10 @@ export default function Almacenes() {
     await cargar()
   }
 
-  const filtered = almacenes.filter(a => {
-    const matchSearch = !search || a.nombre.toLowerCase().includes(search.toLowerCase()) ||
-      (a.ubicacion ?? '').toLowerCase().includes(search.toLowerCase())
-    const pct = a.porcentaje_ocupacion ?? 0
-    const matchOcup = !filtroOcupacion ||
-      (filtroOcupacion === 'libre'  && pct < 50) ||
-      (filtroOcupacion === 'medio'  && pct >= 50 && pct < 80) ||
-      (filtroOcupacion === 'casi'   && pct >= 80 && pct < 100) ||
-      (filtroOcupacion === 'lleno'  && pct >= 100)
-    return matchSearch && matchOcup
-  })
+  const filtered = almacenes.filter(a =>
+    !search || a.nombre.toLowerCase().includes(search.toLowerCase()) ||
+    (a.ubicacion ?? '').toLowerCase().includes(search.toLowerCase())
+  )
 
   const getStatusBadge = (alm: AlmacenStock) => {
     if (alm.capacidad_kg == null || alm.capacidad_kg <= 0) return null
@@ -196,44 +187,13 @@ export default function Almacenes() {
       </div>
 
       {/* Toolbar */}
-      <div className="toolbar-v2">
-        <div className="toolbar-search" style={{ flex: 1 }}>
+      <div className="toolbar">
+        <div className="toolbar-search">
           <span className="search-icon">🔍</span>
-          <input type="text" placeholder="Buscar…" value={search} onChange={e => { setSearch(e.target.value); setFiltroOcupacion('') }} />
+          <input type="text" placeholder="Buscar…" value={search} onChange={e => setSearch(e.target.value)} />
         </div>
-        <button className="btn btn-secondary btn-sm"
-          onClick={() => setShowOcupFilter(v => !v)}
-          style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-          ⚙ Filtros
-          {filtroOcupacion && <span className="filter-badge">1</span>}
-        </button>
-        {(search || filtroOcupacion) && (
-          <button className="filter-clear" onClick={() => { setSearch(''); setFiltroOcupacion('') }}>✕ Limpiar</button>
-        )}
         <span className="toolbar-count">{filtered.length} registro{filtered.length !== 1 ? 's' : ''}</span>
       </div>
-      {showOcupFilter && (
-        <div className="filter-bar">
-          <div className="filter-row">
-            <span className="filter-label">Ocupación</span>
-            <div className="filter-chips">
-              {[
-                { v: '',       l: 'Todos' },
-                { v: 'libre',  l: '🟢 Libre (<50%)' },
-                { v: 'medio',  l: '🔵 Medio (50-80%)' },
-                { v: 'casi',   l: '🟡 Casi lleno (80-100%)' },
-                { v: 'lleno',  l: '🔴 Lleno (≥100%)' },
-              ].map(opt => (
-                <button key={opt.v}
-                  className={`filter-chip${filtroOcupacion === opt.v ? ' active' : ''}`}
-                  onClick={() => setFiltroOcupacion(opt.v)}>
-                  {opt.l}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Cards grid */}
       {loading ? (
@@ -271,17 +231,10 @@ export default function Almacenes() {
                   <div style={{ background: 'var(--bg)', borderRadius: 'var(--r)', padding: '0.4rem 0.6rem' }}>
                     <div style={{ fontSize: '0.64rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>Stock actual</div>
                     <div style={{ fontSize: '1rem', color: 'var(--primary)', fontWeight: 700 }}>{alm.stock_actual.toLocaleString('es-CO')} kg</div>
-                    {alm.capacidad_kg != null && alm.capacidad_kg > 0 && (
-                      <div style={{ fontSize: '0.7rem', color: 'var(--text-dim)', fontWeight: 600, marginTop: '0.1rem' }}>
-                        de {alm.capacidad_kg.toLocaleString('es-CO')} kg total
-                      </div>
-                    )}
                   </div>
                   <div style={{ background: 'var(--bg)', borderRadius: 'var(--r)', padding: '0.4rem 0.6rem' }}>
-                    <div style={{ fontSize: '0.64rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>Libre</div>
-                    <div style={{ fontSize: '1rem', color: alm.capacidad_kg ? 'var(--green)' : 'var(--text-soft)', fontWeight: 700 }}>
-                      {alm.capacidad_kg ? `${(alm.espacio_disponible ?? 0).toLocaleString('es-CO')} kg` : 'Sin límite'}
-                    </div>
+                    <div style={{ fontSize: '0.64rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>Capacidad</div>
+                    <div style={{ fontSize: '1rem', color: 'var(--text-soft)', fontWeight: 700 }}>{alm.capacidad_kg ? `${alm.capacidad_kg.toLocaleString('es-CO')} kg` : 'Sin límite'}</div>
                   </div>
                 </div>
 

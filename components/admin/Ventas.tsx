@@ -109,15 +109,6 @@ export default function Ventas() {
           { key: 'notas', label: 'Notas', render: v => v ? <span style={{color:'var(--text-dim)',fontSize:'0.8rem'}}>{String(v).slice(0,30)}{String(v).length>30?'…':''}</span> : '—' },
         ]}
         fields={fields}
-        searchKey="idcliente"
-        filterKeys={[
-          {
-            key: 'cliente_nombre',
-            label: 'Cliente',
-            resolve: (row) => row.cliente?.nombre ?? '',
-            options: clientes.map(c => ({ value: c.nombre, label: c.nombre })),
-          },
-        ]}
       />
 
       {/* Modal de Detalle de Venta */}

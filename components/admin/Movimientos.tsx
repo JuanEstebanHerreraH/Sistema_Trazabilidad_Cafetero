@@ -39,10 +39,6 @@ export default function Movimientos() {
   const [loading, setLoading]     = useState(true)
   const [error, setError]         = useState<string | null>(null)
   const [search, setSearch]       = useState('')
-  const [filtroTipo, setFiltroTipo] = useState('')
-  const [showFilters, setShowFilters] = useState(false)
-  const [movPage, setMovPage] = useState(1)
-  const MOV_PAGE_SIZE = 20
 
   // Contenido del almacén origen (solo para salida/traslado)
   const [contenidoOrigen, setContenidoOrigen] = useState<ContenidoOrigen[]>([])
@@ -246,19 +242,15 @@ export default function Movimientos() {
   }
 
   const filtered = data.filter(row => {
+    if (!search) return true
     const q = search.toLowerCase()
-    const matchSearch = !search || (
+    return (
       row.tipo?.toLowerCase().includes(q) ||
       row.lote_cafe?.variedad?.toLowerCase().includes(q) ||
       row.almacen_origen?.nombre?.toLowerCase().includes(q) ||
       row.almacen_destino?.nombre?.toLowerCase().includes(q)
     )
-    const matchTipo = !filtroTipo || row.tipo === filtroTipo
-    return matchSearch && matchTipo
   })
-
-  const movTotalPages = Math.max(1, Math.ceil(filtered.length / MOV_PAGE_SIZE))
-  const filteredPage  = filtered.slice((movPage - 1) * MOV_PAGE_SIZE, movPage * MOV_PAGE_SIZE)
 
   // Format almacen option with stock info
   const almacenLabel = (a: AlmacenConStock) => {
@@ -287,43 +279,13 @@ export default function Movimientos() {
       {error && <div className="alert alert-error" style={{ marginBottom: '1rem' }}>⚠ {error}</div>}
 
       {/* Toolbar */}
-      <div className="toolbar-v2">
-        <div className="toolbar-search" style={{ flex: 1 }}>
+      <div className="toolbar">
+        <div className="toolbar-search">
           <span className="search-icon">🔍</span>
           <input type="text" placeholder="Buscar por tipo, lote, almacén…" value={search} onChange={e => setSearch(e.target.value)} />
         </div>
-        <button className="btn btn-secondary btn-sm"
-          onClick={() => setShowFilters(v => !v)}
-          style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-          ⚙ Filtros
-          {filtroTipo && <span className="filter-badge">1</span>}
-        </button>
-        {(search || filtroTipo) && (
-          <button className="filter-clear" onClick={() => { setSearch(''); setFiltroTipo('') }}>✕ Limpiar</button>
-        )}
         <span className="toolbar-count">{filtered.length} registro{filtered.length !== 1 ? 's' : ''}</span>
       </div>
-      {showFilters && (
-        <div className="filter-bar">
-          <div className="filter-row">
-            <span className="filter-label">Tipo</span>
-            <div className="filter-chips">
-              {[
-                { v: '', l: 'Todos' },
-                { v: 'entrada',  l: '📥 Entrada' },
-                { v: 'salida',   l: '📤 Salida' },
-                { v: 'traslado', l: '🔄 Traslado' },
-              ].map(opt => (
-                <button key={opt.v}
-                  className={`filter-chip${filtroTipo === opt.v ? ' active' : ''}`}
-                  onClick={() => setFiltroTipo(opt.v)}>
-                  {opt.l}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Table */}
       {loading ? (
@@ -334,67 +296,41 @@ export default function Movimientos() {
           <p>No hay movimientos{search ? ' que coincidan' : ''}.</p>
         </div>
       ) : (
-        <>
-          <div className="data-table-wrap">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Tipo</th>
-                  <th>Fecha</th>
-                  <th>Cantidad</th>
-                  <th>Lote</th>
-                  <th>Origen</th>
-                  <th>Destino</th>
-                  <th>Acciones</th>
+        <div className="data-table-wrap">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Tipo</th>
+                <th>Fecha</th>
+                <th>Cantidad</th>
+                <th>Lote</th>
+                <th>Origen</th>
+                <th>Destino</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map(row => (
+                <tr key={row.idmovimiento_inventario}>
+                  <td>{row.idmovimiento_inventario}</td>
+                  <td><span className={`badge ${tipoBadge[row.tipo]??'badge-amber'}`}>{tipoIcon[row.tipo]} {row.tipo}</span></td>
+                  <td>{row.fecha_movimiento ? new Date(row.fecha_movimiento).toLocaleDateString('es-CO',{day:'2-digit',month:'short',year:'numeric'}) : '—'}</td>
+                  <td><strong>{Number(row.cantidad).toLocaleString('es-CO')} kg</strong></td>
+                  <td>{row.lote_cafe?.variedad || '—'}</td>
+                  <td>{row.almacen_origen?.nombre || <span style={{color:'var(--text-muted)'}}>—</span>}</td>
+                  <td>{row.almacen_destino?.nombre || <span style={{color:'var(--text-muted)'}}>—</span>}</td>
+                  <td>
+                    <div className="actions">
+                      <button className="btn btn-secondary btn-sm" onClick={() => openEdit(row)}>✏ Editar</button>
+                      <button className="btn btn-danger btn-sm" onClick={() => setDeleteId(row.idmovimiento_inventario)}>🗑</button>
+                    </div>
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {filteredPage.map(row => (
-                  <tr key={row.idmovimiento_inventario}>
-                    <td>{row.idmovimiento_inventario}</td>
-                    <td><span className={`badge ${tipoBadge[row.tipo]??'badge-amber'}`}>{tipoIcon[row.tipo]} {row.tipo}</span></td>
-                    <td>{row.fecha_movimiento ? new Date(row.fecha_movimiento).toLocaleDateString('es-CO',{day:'2-digit',month:'short',year:'numeric'}) : '—'}</td>
-                    <td><strong>{Number(row.cantidad).toLocaleString('es-CO')} kg</strong></td>
-                    <td>{row.lote_cafe?.variedad || '—'}</td>
-                    <td>{row.almacen_origen?.nombre || <span style={{color:'var(--text-muted)'}}>—</span>}</td>
-                    <td>{row.almacen_destino?.nombre || <span style={{color:'var(--text-muted)'}}>—</span>}</td>
-                    <td>
-                      <div className="actions">
-                        <button className="btn btn-secondary btn-sm" onClick={() => openEdit(row)}>✏ Editar</button>
-                        <button className="btn btn-danger btn-sm" onClick={() => setDeleteId(row.idmovimiento_inventario)}>🗑</button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          {movTotalPages > 1 && (
-            <div className="pagination-bar">
-              <div className="pagination-info">
-                {(movPage - 1) * MOV_PAGE_SIZE + 1}–{Math.min(filtered.length, movPage * MOV_PAGE_SIZE)} de {filtered.length}
-              </div>
-              <div className="pagination-controls">
-                <button className="page-btn page-btn-wide" disabled={movPage <= 1} onClick={() => setMovPage(p => p - 1)}>← Ant</button>
-                {Array.from({ length: movTotalPages }, (_, i) => i + 1)
-                  .filter(p => p === 1 || p === movTotalPages || Math.abs(p - movPage) <= 1)
-                  .reduce<(number | '…')[]>((acc, p, i, arr) => {
-                    if (i > 0 && (p as number) - (arr[i - 1] as number) > 1) acc.push('…')
-                    acc.push(p)
-                    return acc
-                  }, [])
-                  .map((p, i) =>
-                    p === '…'
-                      ? <span key={`e${i}`} className="page-ellipsis">…</span>
-                      : <button key={p} className={`page-btn${movPage === p ? ' active' : ''}`}
-                          onClick={() => setMovPage(p as number)}>{p}</button>
-                  )}
-                <button className="page-btn page-btn-wide" disabled={movPage >= movTotalPages} onClick={() => setMovPage(p => p + 1)}>Sig →</button>
-              </div>
-            </div>
-          )}
-        </>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
 
       {/* Modal Crear/Editar */}
