@@ -11,12 +11,12 @@ export default function Registros() {
     {
       key: 'idlote_cafe', label: 'Lote de café', type: 'select', required: true,
       options: lotes.map(l => ({ value: l.idlote_cafe, label: l.variedad })),
-      description: 'Lote al que se le aplicó el proceso. Gestiona lotes en la sección "Lotes de Café".',
+      description: 'Lote al que se le aplicó el proceso.',
     },
     {
       key: 'idproceso', label: 'Proceso aplicado', type: 'select', required: true,
       options: procesos.map(p => ({ value: p.idproceso, label: p.nombre })),
-      description: 'Tipo de beneficio realizado: Lavado, Natural, Honey, etc. Crea nuevos en "Procesos".',
+      description: 'Tipo de beneficio: Lavado, Natural, Honey, etc.',
     },
     { section: 'Periodo de ejecución' } as any,
     {
@@ -30,13 +30,11 @@ export default function Registros() {
     {
       key: 'idusuario', label: 'Responsable del proceso', type: 'select', required: false,
       options: usuarios.map(u => ({ value: u.idusuario, label: u.nombre })),
-      description: 'Operario o técnico a cargo de ejecutar y supervisar el proceso.',
     },
     { section: 'Observaciones' } as any,
     {
       key: 'notas', label: 'Notas del proceso', type: 'textarea', required: false, colSpan: 'full',
-      placeholder: 'Temperatura de fermentación, pH, condiciones climáticas, observaciones…',
-      description: 'Anotaciones técnicas relevantes: condiciones del proceso, incidencias, parámetros medidos.',
+      placeholder: 'Temperatura, pH, condiciones climáticas, incidencias…',
     },
   ]
 
@@ -53,15 +51,22 @@ export default function Registros() {
       selectQuery="*, lote_cafe(variedad), proceso(nombre), usuario(nombre)"
       orderBy="fecha_inicio"
       columns={[
-        { key: 'idregistro_proceso', label: '#' },
-        { key: 'idlote_cafe',  label: 'Lote',     render: (_, r) => r.lote_cafe?.variedad || '—' },
-        { key: 'idproceso',    label: 'Proceso',   render: (_, r) => r.proceso?.nombre    || '—' },
-        { key: 'fecha_inicio', label: 'Inicio',    render: v => v ? new Date(v).toLocaleDateString('es-CO',{day:'2-digit',month:'short'}) : '—' },
-        { key: 'fecha_fin',    label: 'Fin',       render: v => v ? new Date(v).toLocaleDateString('es-CO',{day:'2-digit',month:'short'}) : '—' },
-        { key: 'duracion',     label: 'Duración',  render: (_, r) => <span style={{color:'var(--text-dim)',fontSize:'0.82rem'}}>{diffHours(r)}</span> },
+        { key: 'idregistro_proceso', label: '#', sortable: true },
+        { key: 'idlote_cafe',  label: 'Lote',       render: (_, r) => r.lote_cafe?.variedad || '—' },
+        { key: 'idproceso',    label: 'Proceso',     render: (_, r) => <span className="badge badge-amber">{r.proceso?.nombre || '—'}</span> },
+        { key: 'fecha_inicio', label: 'Inicio', sortable: true, render: v => v ? new Date(v).toLocaleDateString('es-CO', { day:'2-digit', month:'short', year:'numeric' }) : '—' },
+        { key: 'fecha_fin',    label: 'Fin',    sortable: true, render: v => v ? new Date(v).toLocaleDateString('es-CO', { day:'2-digit', month:'short', year:'numeric' }) : <span style={{ color: 'var(--amber)', fontSize: '0.8rem' }}>En curso</span> },
+        { key: 'duracion',     label: 'Duración',   render: (_, r) => <span style={{ color: 'var(--text-dim)', fontSize: '0.82rem' }}>{diffHours(r)}</span> },
         { key: 'idusuario',    label: 'Responsable', render: (_, r) => r.usuario?.nombre || '—' },
       ]}
       fields={fields}
+      searchKey="notas"
+      filterSelects={procesos.length > 0 ? [
+        { key: 'idproceso', label: 'Proceso', options: procesos.map(p => ({ value: String(p.idproceso), label: p.nombre })) },
+      ] : undefined}
+      dateFilters={[
+        { key: 'fecha_inicio', label: 'Fecha de inicio' },
+      ]}
     />
   )
 }

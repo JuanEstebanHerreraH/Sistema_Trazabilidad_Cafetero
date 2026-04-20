@@ -128,10 +128,20 @@ export default function Almacenes() {
     await cargar()
   }
 
-  const filtered = almacenes.filter(a =>
-    !search || a.nombre.toLowerCase().includes(search.toLowerCase()) ||
-    (a.ubicacion ?? '').toLowerCase().includes(search.toLowerCase())
-  )
+  const [filtroEstado, setFiltroEstado] = useState('')
+
+  const filtered = almacenes.filter(a => {
+    const matchSearch = !search || a.nombre.toLowerCase().includes(search.toLowerCase()) ||
+      (a.ubicacion ?? '').toLowerCase().includes(search.toLowerCase())
+    const pct = a.porcentaje_ocupacion ?? 0
+    const matchEstado =
+      !filtroEstado ? true :
+      filtroEstado === 'lleno'      ? pct >= 100 :
+      filtroEstado === 'casi_lleno' ? pct >= 80 && pct < 100 :
+      filtroEstado === 'disponible' ? pct < 80 :
+      filtroEstado === 'sin_limite' ? (a.capacidad_kg == null || a.capacidad_kg <= 0) : true
+    return matchSearch && matchEstado
+  })
 
   const getStatusBadge = (alm: AlmacenStock) => {
     if (alm.capacidad_kg == null || alm.capacidad_kg <= 0) return null
@@ -186,13 +196,29 @@ export default function Almacenes() {
         ))}
       </div>
 
-      {/* Toolbar */}
-      <div className="toolbar">
-        <div className="toolbar-search">
-          <span className="search-icon">🔍</span>
-          <input type="text" placeholder="Buscar…" value={search} onChange={e => setSearch(e.target.value)} />
+      {/* Filter Bar */}
+      <div className="filter-bar">
+        <div className="filter-row">
+          <div className="toolbar-search">
+            <span className="search-icon">🔍</span>
+            <input type="text" placeholder="Buscar almacén o ubicación…" value={search} onChange={e => setSearch(e.target.value)} />
+          </div>
+          <div className="filter-segments">
+            {([
+              { v: '',           lbl: 'Todos' },
+              { v: 'disponible', lbl: '🟢 Con espacio' },
+              { v: 'casi_lleno', lbl: '🟡 Casi lleno' },
+              { v: 'lleno',      lbl: '🔴 Lleno' },
+              { v: 'sin_limite', lbl: '∞ Sin límite' },
+            ] as const).map(o => (
+              <button key={o.v} className={`filter-seg${filtroEstado === o.v ? ' active' : ''}`}
+                onClick={() => setFiltroEstado(o.v)}>{o.lbl}</button>
+            ))}
+          </div>
+          <span className="toolbar-count" style={{ marginLeft: 'auto' }}>
+            {filtered.length}{filtered.length !== almacenes.length && <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}> de {almacenes.length}</span>} almacenes
+          </span>
         </div>
-        <span className="toolbar-count">{filtered.length} registro{filtered.length !== 1 ? 's' : ''}</span>
       </div>
 
       {/* Cards grid */}

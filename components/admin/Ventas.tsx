@@ -84,11 +84,11 @@ export default function Ventas() {
         selectQuery="*, cliente(nombre)"
         orderBy="fecha_venta"
         columns={[
-          { key: 'idventa',    label: '#' },
-          { key: 'fecha_venta',label: 'Fecha', render: v => v ? new Date(v).toLocaleDateString('es-CO', { day:'2-digit', month:'short', year:'numeric' }) : '—' },
+          { key: 'idventa',    label: '#', sortable: true },
+          { key: 'fecha_venta', label: 'Fecha', sortable: true, render: v => v ? new Date(v).toLocaleDateString('es-CO', { day:'2-digit', month:'short', year:'numeric' }) : '—' },
           { key: 'idcliente',  label: 'Cliente', render: (_, r) => r.cliente?.nombre || '—' },
-          { key: 'total_kg',   label: 'Kg', render: v => v ? <strong>{Number(v).toLocaleString('es-CO')} kg</strong> : '—' },
-          { key: 'precio_kg',  label: 'Precio/kg', render: v => v ? `$${Number(v).toLocaleString('es-CO')}` : '—' },
+          { key: 'total_kg',   label: 'Kg', sortable: true, render: v => v ? <strong>{Number(v).toLocaleString('es-CO')} kg</strong> : '—' },
+          { key: 'precio_kg',  label: 'Precio/kg', sortable: true, render: v => v ? `$${Number(v).toLocaleString('es-CO')}` : '—' },
           {
             key: 'total_cop', label: 'Total $',
             render: (_, r) => {
@@ -109,6 +109,13 @@ export default function Ventas() {
           { key: 'notas', label: 'Notas', render: v => v ? <span style={{color:'var(--text-dim)',fontSize:'0.8rem'}}>{String(v).slice(0,30)}{String(v).length>30?'…':''}</span> : '—' },
         ]}
         fields={fields}
+        searchKey="notas"
+        filterSelects={[
+          { key: 'idcliente', label: 'Cliente', options: clientes.map(c => ({ value: String(c.idcliente), label: c.nombre })) },
+        ]}
+        dateFilters={[
+          { key: 'fecha_venta', label: 'Fecha de venta' },
+        ]}
       />
 
       {/* Modal de Detalle de Venta */}

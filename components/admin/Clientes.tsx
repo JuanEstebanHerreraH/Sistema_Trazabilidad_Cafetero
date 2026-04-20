@@ -7,8 +7,8 @@ export default function Clientes() {
       title="Clientes" subtitle="Clientes compradores de café" icon="🤝"
       table="cliente" idField="idcliente" orderBy="nombre"
       columns={[
-        { key: 'idcliente', label: '#' },
-        { key: 'nombre',    label: 'Nombre' },
+        { key: 'idcliente', label: '#', sortable: true },
+        { key: 'nombre',    label: 'Nombre', sortable: true },
         { key: 'email',     label: 'Email' },
         { key: 'telefono',  label: 'Teléfono' },
       ]}

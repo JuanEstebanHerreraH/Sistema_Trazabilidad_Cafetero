@@ -1,5 +1,5 @@
 'use client'
-import { useState, useMemo, ReactNode } from 'react'
+import { useState, useMemo, ReactNode, useCallback } from 'react'
 import { useCrud } from '../hooks/useCrud'
 import Modal from './Modal'
 
@@ -7,6 +7,7 @@ export interface Column {
   key: string
   label: string
   render?: (value: any, row: any) => ReactNode
+  sortable?: boolean
 }
 
 export interface Field {
@@ -25,6 +26,17 @@ export interface Field {
   colSpan?: 'full' | 'half'
 }
 
+export interface FilterSelect {
+  key: string
+  label: string
+  options: { value: string; label: string }[]
+}
+
+export interface DateRangeFilter {
+  key: string
+  label: string
+}
+
 interface CrudPageProps {
   title: string
   subtitle?: string
@@ -37,18 +49,27 @@ interface CrudPageProps {
   fields: Field[]
   searchKey?: string
   extraActions?: (row: any) => ReactNode
-  filterSelects?: { key: string; label: string; options: { value: string; label: string }[] }[]
+  filterSelects?: FilterSelect[]
+  dateFilters?: DateRangeFilter[]
 }
+
+type SortDir = 'asc' | 'desc' | null
 
 export default function CrudPage({
   title, subtitle, icon, table, idField,
   selectQuery = '*', orderBy, columns, fields,
-  searchKey, extraActions, filterSelects,
+  searchKey, extraActions, filterSelects, dateFilters,
 }: CrudPageProps) {
   const { data, loading, error, insert, update, remove } = useCrud(table, idField, selectQuery, orderBy)
 
   const [search, setSearch] = useState('')
   const [filterValues, setFilterValues] = useState<Record<string, string>>({})
+  const [dateFrom, setDateFrom] = useState<Record<string, string>>({})
+  const [dateTo, setDateTo] = useState<Record<string, string>>({})
+  const [panelOpen, setPanelOpen] = useState(false)
+  const [sortKey, setSortKey] = useState<string | null>(null)
+  const [sortDir, setSortDir] = useState<SortDir>(null)
+
   const [modalOpen, setModalOpen] = useState(false)
   const [viewModal, setViewModal] = useState(false)
   const [viewRecord, setViewRecord] = useState<any>(null)
@@ -61,81 +82,102 @@ export default function CrudPage({
 
   const dataFields = useMemo(() => fields.filter(f => !!f.key), [fields])
 
+  const hasFilters = useMemo(() => {
+    const hasSelects = filterSelects?.some(fs => filterValues[fs.key]) ?? false
+    const hasDates = dateFilters?.some(df => dateFrom[df.key] || dateTo[df.key]) ?? false
+    return hasSelects || hasDates
+  }, [filterValues, dateFrom, dateTo, filterSelects, dateFilters])
+
+  const activeFilterCount = useMemo(() => {
+    let count = 0
+    filterSelects?.forEach(fs => { if (filterValues[fs.key]) count++ })
+    dateFilters?.forEach(df => { if (dateFrom[df.key] || dateTo[df.key]) count++ })
+    return count
+  }, [filterValues, dateFrom, dateTo, filterSelects, dateFilters])
+
+  const clearFilter = useCallback((key: string, type: 'select' | 'date') => {
+    if (type === 'select') setFilterValues(p => { const n = { ...p }; delete n[key]; return n })
+    else {
+      setDateFrom(p => { const n = { ...p }; delete n[key]; return n })
+      setDateTo(p => { const n = { ...p }; delete n[key]; return n })
+    }
+  }, [])
+
+  const clearAll = useCallback(() => {
+    setFilterValues({})
+    setDateFrom({})
+    setDateTo({})
+    setSearch('')
+  }, [])
+
   const filtered = useMemo(() => {
     let result = data
     if (search && searchKey) {
       const q = search.toLowerCase()
       result = result.filter(row => String(row[searchKey] ?? '').toLowerCase().includes(q))
     }
-    if (filterSelects) {
-      filterSelects.forEach(fs => {
-        const val = filterValues[fs.key]
-        if (val && val !== '') {
-          result = result.filter(row => String(row[fs.key] ?? '') === val)
-        }
+    filterSelects?.forEach(fs => {
+      const val = filterValues[fs.key]
+      if (val) result = result.filter(row => String(row[fs.key] ?? '') === val)
+    })
+    dateFilters?.forEach(df => {
+      const from = dateFrom[df.key]
+      const to = dateTo[df.key]
+      if (from) result = result.filter(row => row[df.key] && new Date(row[df.key]) >= new Date(from))
+      if (to) result = result.filter(row => row[df.key] && new Date(row[df.key]) <= new Date(to + 'T23:59:59'))
+    })
+    if (sortKey && sortDir) {
+      result = [...result].sort((a, b) => {
+        const cmp = String(a[sortKey] ?? '').localeCompare(String(b[sortKey] ?? ''), 'es', { numeric: true })
+        return sortDir === 'asc' ? cmp : -cmp
       })
     }
     return result
-  }, [data, search, searchKey, filterValues, filterSelects])
+  }, [data, search, searchKey, filterValues, filterSelects, dateFilters, dateFrom, dateTo, sortKey, sortDir])
+
+  const toggleSort = (key: string) => {
+    if (sortKey === key) {
+      if (sortDir === 'asc') setSortDir('desc')
+      else { setSortKey(null); setSortDir(null) }
+    } else { setSortKey(key); setSortDir('asc') }
+  }
 
   const openCreate = () => {
     const defaults: Record<string, any> = {}
     dataFields.forEach(f => { defaults[f.key!] = f.default ?? '' })
-    setForm(defaults)
-    setEditRecord(null)
-    setFormError(null)
-    setModalOpen(true)
+    setForm(defaults); setEditRecord(null); setFormError(null); setModalOpen(true)
   }
 
   const openEdit = (record: any) => {
     const copy: Record<string, any> = {}
     dataFields.forEach(f => { copy[f.key!] = record[f.key!] ?? '' })
-    setForm(copy)
-    setEditRecord(record)
-    setFormError(null)
-    setModalOpen(true)
+    setForm(copy); setEditRecord(record); setFormError(null); setModalOpen(true)
   }
 
-  const openView = (record: any) => {
-    setViewRecord(record)
-    setViewModal(true)
-  }
+  const openView = (record: any) => { setViewRecord(record); setViewModal(true) }
 
   const handleSubmit = async () => {
-    setSaving(true)
-    setFormError(null)
+    setSaving(true); setFormError(null)
     try {
       const payload: Record<string, any> = {}
       dataFields.forEach(f => {
         const val = form[f.key!]
-        if (val === '' || val === null || val === undefined) {
-          payload[f.key!] = f.required ? val : null
-        } else if (f.type === 'number') {
-          payload[f.key!] = Number(val)
-        } else {
-          payload[f.key!] = val
-        }
+        if (val === '' || val === null || val === undefined) payload[f.key!] = f.required ? val : null
+        else if (f.type === 'number') payload[f.key!] = Number(val)
+        else payload[f.key!] = val
       })
       if (editRecord) await update(editRecord[idField], payload)
       else await insert(payload)
       setModalOpen(false)
-    } catch (err: any) {
-      setFormError(err.message)
-    } finally {
-      setSaving(false)
-    }
+    } catch (err: any) { setFormError(err.message) }
+    finally { setSaving(false) }
   }
 
   const handleDelete = async () => {
     setDeleting(true)
-    try {
-      await remove(deleteId)
-      setDeleteId(null)
-    } catch (err: any) {
-      alert('Error al eliminar: ' + err.message)
-    } finally {
-      setDeleting(false)
-    }
+    try { await remove(deleteId); setDeleteId(null) }
+    catch (err: any) { alert('Error al eliminar: ' + err.message) }
+    finally { setDeleting(false) }
   }
 
   const renderField = (field: Field) => (
@@ -169,21 +211,36 @@ export default function CrudPage({
     </div>
   )
 
-  // Helper to get a readable value from a nested object
   const getDisplayValue = (row: any, key: string) => {
     const col = columns.find(c => c.key === key)
     const raw = row[key]
-    if (col?.render) {
-      try { return col.render(raw, row) } catch { return String(raw ?? '—') }
-    }
+    if (col?.render) { try { return col.render(raw, row) } catch { return String(raw ?? '—') } }
     if (raw === null || raw === undefined) return '—'
     if (typeof raw === 'object') return JSON.stringify(raw)
     return String(raw)
   }
 
+  const hasAdvancedFilters = (filterSelects && filterSelects.length > 0) || (dateFilters && dateFilters.length > 0)
+
+  const activeChips: { key: string; label: string; value: string; type: 'select' | 'date' }[] = []
+  filterSelects?.forEach(fs => {
+    const val = filterValues[fs.key]
+    if (val) {
+      const opt = fs.options.find(o => o.value === val)
+      activeChips.push({ key: fs.key, label: fs.label, value: opt?.label ?? val, type: 'select' })
+    }
+  })
+  dateFilters?.forEach(df => {
+    const from = dateFrom[df.key]
+    const to = dateTo[df.key]
+    if (from || to) {
+      const range = [from && `desde ${from}`, to && `hasta ${to}`].filter(Boolean).join(' ')
+      activeChips.push({ key: df.key, label: df.label, value: range, type: 'date' })
+    }
+  })
+
   return (
     <div>
-      {/* Header */}
       <div className="page-header">
         <div className="page-header-left">
           <div className="page-icon">{icon}</div>
@@ -197,23 +254,76 @@ export default function CrudPage({
 
       {error && <div className="alert alert-error" style={{ marginBottom: '1rem' }}>⚠ {error}</div>}
 
-      <div className="toolbar">
-        {searchKey && (
-          <div className="toolbar-search">
-            <span className="search-icon">🔍</span>
-            <input type="text" placeholder="Buscar…" value={search}
-              onChange={e => setSearch(e.target.value)} />
+      {/* ── Enhanced Filter Bar ── */}
+      <div className="filter-bar">
+        <div className="filter-row">
+          {searchKey && (
+            <div className="toolbar-search">
+              <span className="search-icon">🔍</span>
+              <input type="text" placeholder="Buscar…" value={search}
+                onChange={e => setSearch(e.target.value)} />
+            </div>
+          )}
+          {hasAdvancedFilters && (
+            <button className={`btn-filter${panelOpen ? ' active' : ''}`}
+              onClick={() => setPanelOpen(p => !p)}>
+              <span>⚡ Filtros</span>
+              {activeFilterCount > 0 && <span className="filter-badge">{activeFilterCount}</span>}
+            </button>
+          )}
+          <span className="toolbar-count" style={{ marginLeft: 'auto' }}>
+            {filtered.length} registro{filtered.length !== 1 ? 's' : ''}
+            {data.length !== filtered.length && (
+              <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}> de {data.length}</span>
+            )}
+          </span>
+        </div>
+
+        {panelOpen && hasAdvancedFilters && (
+          <div className="filter-panel">
+            {filterSelects?.map(fs => (
+              <div className="filter-group" key={fs.key}>
+                <span className="filter-label">{fs.label}</span>
+                <select value={filterValues[fs.key] ?? ''}
+                  onChange={e => setFilterValues(p => ({ ...p, [fs.key]: e.target.value }))}>
+                  <option value="">Todos</option>
+                  {fs.options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+              </div>
+            ))}
+            {dateFilters?.map(df => (
+              <div className="filter-group" key={df.key} style={{ gridColumn: 'span 2' }}>
+                <span className="filter-label">📅 {df.label}</span>
+                <div className="filter-date-range">
+                  <input type="date" value={dateFrom[df.key] ?? ''}
+                    onChange={e => setDateFrom(p => ({ ...p, [df.key]: e.target.value }))} />
+                  <input type="date" value={dateTo[df.key] ?? ''}
+                    onChange={e => setDateTo(p => ({ ...p, [df.key]: e.target.value }))} />
+                </div>
+              </div>
+            ))}
+            {hasFilters && (
+              <div className="filter-group" style={{ justifyContent: 'flex-end' }}>
+                <span className="filter-label">&nbsp;</span>
+                <button className="btn btn-ghost btn-sm" onClick={clearAll} style={{ marginTop: '0.2rem' }}>
+                  ✕ Limpiar todo
+                </button>
+              </div>
+            )}
           </div>
         )}
-        {filterSelects?.map(fs => (
-          <select key={fs.key} className="form-select" style={{ flex: '0 0 auto', minWidth: 140 }}
-            value={filterValues[fs.key] ?? ''}
-            onChange={e => setFilterValues(p => ({ ...p, [fs.key]: e.target.value }))}>
-            <option value="">Todos: {fs.label}</option>
-            {fs.options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
-        ))}
-        <span className="toolbar-count">{filtered.length} registro{filtered.length !== 1 ? 's' : ''}</span>
+
+        {activeChips.length > 0 && (
+          <div className="filter-chips">
+            {activeChips.map(chip => (
+              <span key={chip.key} className="filter-chip">
+                <span style={{ color: 'var(--text-dim)', fontWeight: 500 }}>{chip.label}:</span> {chip.value}
+                <button className="filter-chip-remove" onClick={() => clearFilter(chip.key, chip.type)}>✕</button>
+              </span>
+            ))}
+            <button className="filter-chips-clear" onClick={clearAll}>Limpiar filtros</button>
+          </div>
+        )}
       </div>
 
       {loading ? (
@@ -221,15 +331,31 @@ export default function CrudPage({
       ) : filtered.length === 0 ? (
         <div className="empty-state">
           <div className="empty-icon">{icon}</div>
-          <p>No hay registros{search ? ' que coincidan' : ''}.</p>
-          {!search && <small>Haz clic en &quot;+ Nuevo&quot; para agregar el primero.</small>}
+          <p>No hay registros{search || hasFilters ? ' que coincidan' : ''}.</p>
+          {!search && !hasFilters && <small>Haz clic en &quot;+ Nuevo&quot; para agregar el primero.</small>}
+          {(search || hasFilters) && (
+            <button className="btn btn-ghost btn-sm" onClick={clearAll} style={{ marginTop: '0.5rem' }}>
+              ✕ Limpiar filtros
+            </button>
+          )}
         </div>
       ) : (
         <div className="data-table-wrap table-responsive">
           <table className="data-table">
             <thead>
               <tr>
-                {columns.map(col => <th key={col.key}>{col.label}</th>)}
+                {columns.map(col => (
+                  <th key={col.key}
+                    className={col.sortable ? 'th-sortable' : ''}
+                    onClick={col.sortable ? () => toggleSort(col.key) : undefined}>
+                    {col.label}
+                    {col.sortable && (
+                      <span className={`sort-icon${sortKey === col.key ? (sortDir === 'asc' ? ' asc' : ' desc') : ''}`}>
+                        {sortKey === col.key ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ' ↕'}
+                      </span>
+                    )}
+                  </th>
+                ))}
                 <th>Acciones</th>
               </tr>
             </thead>
@@ -257,9 +383,7 @@ export default function CrudPage({
         </div>
       )}
 
-      {/* ── Modal VER detalle ── */}
-      <Modal isOpen={viewModal} onClose={() => setViewModal(false)}
-        title={`Detalle — ${title}`}
+      <Modal isOpen={viewModal} onClose={() => setViewModal(false)} title={`Detalle — ${title}`}
         footer={
           <>
             <button className="btn btn-secondary" onClick={() => setViewModal(false)}>Cerrar</button>
@@ -271,8 +395,7 @@ export default function CrudPage({
             {columns.map(col => (
               <div key={col.key} style={{
                 display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
-                gap: '1rem', padding: '0.5rem 0',
-                borderBottom: '1px solid var(--border-soft)',
+                gap: '1rem', padding: '0.5rem 0', borderBottom: '1px solid var(--border-soft)',
               }}>
                 <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)',
                   textTransform: 'uppercase', letterSpacing: '0.06em', flexShrink: 0 }}>
@@ -287,7 +410,6 @@ export default function CrudPage({
         )}
       </Modal>
 
-      {/* ── Modal CREAR / EDITAR ── */}
       <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)}
         title={editRecord ? `Editar — ${title}` : `Nuevo — ${title}`}
         footer={
@@ -311,9 +433,7 @@ export default function CrudPage({
         </div>
       </Modal>
 
-      {/* ── Modal ELIMINAR ── */}
-      <Modal isOpen={deleteId !== null} onClose={() => setDeleteId(null)}
-        title="Confirmar eliminación"
+      <Modal isOpen={deleteId !== null} onClose={() => setDeleteId(null)} title="Confirmar eliminación"
         footer={
           <>
             <button className="btn btn-secondary" onClick={() => setDeleteId(null)} disabled={deleting}>Cancelar</button>
