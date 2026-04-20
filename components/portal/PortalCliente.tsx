@@ -504,12 +504,14 @@ function CarritoView({ carrito, totalKg, totalCOP, onQuitar, onConfirmar, compra
   )
 }
 
-/* ── Historial de compras con paginación ─────────────────────────────────────── */
+/* ── Historial de compras — compact + expandible ─────────────────────────────── */
 function HistorialCompras({ ventas, totalVentas, page, totalPages, onPage, onVerCatalogo }: {
   ventas: VentaHistorial[]; totalVentas: number
   page: number; totalPages: number
   onPage: (p: number) => void; onVerCatalogo: () => void
 }) {
+  const [expandedId, setExpandedId] = useState<number | null>(null)
+
   if (totalVentas === 0) return (
     <div className="empty-state">
       <div className="empty-icon">📦</div>
@@ -519,56 +521,105 @@ function HistorialCompras({ ventas, totalVentas, page, totalPages, onPage, onVer
   )
   return (
     <>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-        {ventas.map(v => (
-          <div key={v.idventa} className="venta-card">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.6rem' }}>
-              <div>
-                <div style={{ fontWeight: 700, color: 'var(--text)', fontSize: '0.92rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  Compra #{v.idventa}
-                  <span className="badge badge-green">✓ Completada</span>
-                </div>
-                <div style={{ color: 'var(--text-dim)', fontSize: '0.76rem', marginTop: '0.1rem' }}>
-                  {new Date(v.fecha_venta).toLocaleDateString('es-CO', { dateStyle: 'long' })}
-                </div>
-              </div>
-              <div style={{ textAlign: 'right' }}>
+      {/* Summary strip */}
+      <div className="summary-strip" style={{ marginBottom: '0.75rem' }}>
+        <div className="summary-item">
+          <span>Total compras:</span><strong>{totalVentas}</strong>
+        </div>
+        <div className="summary-sep">·</div>
+        <div className="summary-item">
+          <span>Esta página:</span><strong>{ventas.length}</strong>
+        </div>
+        <div className="summary-item" style={{ marginLeft: 'auto', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+          Haz clic en una fila para ver el detalle
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+        {ventas.map(v => {
+          const expanded = expandedId === v.idventa
+          const totalCOP = v.total_kg && v.precio_kg ? v.total_kg * v.precio_kg : 0
+          return (
+            <div key={v.idventa} style={{
+              background: 'var(--bg-card)',
+              border: `1px solid ${expanded ? 'var(--primary)' : 'var(--border-soft)'}`,
+              borderRadius: 'var(--r-lg)',
+              overflow: 'hidden',
+              transition: 'border-color 0.15s',
+            }}>
+              {/* Compact row — always visible */}
+              <div
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '0.75rem',
+                  padding: '0.6rem 0.9rem', cursor: 'pointer',
+                  flexWrap: 'wrap',
+                }}
+                onClick={() => setExpandedId(expanded ? null : v.idventa)}
+              >
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 700, minWidth: 28 }}>#{v.idventa}</span>
+                <span className="badge badge-green" style={{ fontSize: '0.62rem', padding: '0.1rem 0.45rem' }}>✓</span>
+                <span style={{ fontSize: '0.82rem', color: 'var(--text-soft)', flex: 1, minWidth: 80 }}>
+                  {new Date(v.fecha_venta).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })}
+                </span>
                 {v.total_kg && (
-                  <>
-                    <div style={{ fontWeight: 700, color: 'var(--primary)', fontSize: '1rem' }}>{v.total_kg} kg</div>
-                    <div style={{ fontSize: '0.78rem', color: 'var(--amber)', fontWeight: 700 }}>
-                      📦 {(v.total_kg / 70).toFixed(2)} bultos
-                    </div>
-                    {v.precio_kg && (
-                      <div style={{ color: 'var(--text-dim)', fontSize: '0.76rem' }}>
-                        ${(v.total_kg * v.precio_kg).toLocaleString('es-CO')} COP
+                  <span style={{ fontSize: '0.82rem', color: 'var(--primary)', fontWeight: 700 }}>
+                    {v.total_kg} kg
+                  </span>
+                )}
+                {totalCOP > 0 && (
+                  <span style={{ fontSize: '0.82rem', color: 'var(--text)', fontWeight: 700 }}>
+                    ${totalCOP.toLocaleString('es-CO')}
+                  </span>
+                )}
+                <span style={{ marginLeft: 'auto', color: 'var(--text-muted)', fontSize: '0.75rem' }}>
+                  {expanded ? '▲' : '▼'}
+                </span>
+              </div>
+
+              {/* Expanded detail */}
+              {expanded && (
+                <div style={{
+                  borderTop: '1px solid var(--border-soft)',
+                  padding: '0.75rem 0.9rem',
+                  background: 'var(--bg-1)',
+                  display: 'flex', flexDirection: 'column', gap: '0.3rem',
+                }}>
+                  <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap', marginBottom: '0.4rem' }}>
+                    {v.total_kg && (
+                      <div className="record-field">
+                        <span className="record-field-label">Bultos</span>
+                        <span className="record-field-value" style={{ color: 'var(--amber)' }}>
+                          📦 {(v.total_kg / 70).toFixed(2)}
+                        </span>
                       </div>
                     )}
-                  </>
-                )}
-              </div>
-            </div>
-            {(v.detalle_venta ?? []).length > 0 && (
-              <div style={{ borderTop: '1px solid var(--border-soft)', paddingTop: '0.6rem', display: 'flex', flexDirection: 'column', gap: '0.28rem' }}>
-                {v.detalle_venta.map(d => (
-                  <div key={d.iddetalle_venta}
-                    style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.79rem', color: 'var(--text-soft)' }}>
-                    <span>☕ {d.lote_cafe?.variedad ?? '—'}{d.lote_cafe?.finca ? ` · ${d.lote_cafe.finca.nombre}` : ''}</span>
-                    <span style={{ fontWeight: 600 }}>{d.cantidad} kg — ${(d.cantidad * d.precio_venta).toLocaleString('es-CO')}</span>
+                    {v.precio_kg && (
+                      <div className="record-field">
+                        <span className="record-field-label">Precio/kg</span>
+                        <span className="record-field-value">${v.precio_kg.toLocaleString('es-CO')}</span>
+                      </div>
+                    )}
                   </div>
-                ))}
-              </div>
-            )}
-            {v.notas && (
-              <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginTop: '0.4rem' }}>📝 {v.notas}</div>
-            )}
-          </div>
-        ))}
+                  {(v.detalle_venta ?? []).length > 0 && v.detalle_venta.map(d => (
+                    <div key={d.iddetalle_venta}
+                      style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: 'var(--text-soft)', padding: '0.15rem 0' }}>
+                      <span>☕ {d.lote_cafe?.variedad ?? '—'}{d.lote_cafe?.finca ? ` · ${d.lote_cafe.finca.nombre}` : ''}</span>
+                      <span style={{ fontWeight: 600 }}>{d.cantidad} kg — ${(d.cantidad * d.precio_venta).toLocaleString('es-CO')}</span>
+                    </div>
+                  ))}
+                  {v.notas && (
+                    <div style={{ fontSize: '0.73rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>📝 {v.notas}</div>
+                  )}
+                </div>
+              )}
+            </div>
+          )
+        })}
       </div>
 
       {totalPages > 1 && (
         <div className="pagination-bar">
-          <div className="pagination-info">Página {page} de {totalPages} · {totalVentas} compras en total</div>
+          <div className="pagination-info">Página {page} de {totalPages} · {totalVentas} compras</div>
           <div className="pagination-controls">
             <button className="page-btn page-btn-wide" disabled={page <= 1} onClick={() => onPage(page - 1)}>← Ant</button>
             {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (

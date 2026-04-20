@@ -1,4 +1,5 @@
 'use client'
+import React from 'react'
 import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '../../utils/supabase/client'
 
@@ -130,68 +131,254 @@ function PortalOperador({ usuario, onLogout }: { usuario: UsuarioPortal; onLogou
         {loading ? (
           <div className="loading-center"><div className="spinner" /><span>Cargando…</span></div>
         ) : tab === 'lotes' ? (
-          <div className="data-table-wrap table-responsive">
-            <table className="data-table">
-              <thead>
-                <tr><th>#</th><th>Variedad</th><th>Finca</th><th>Stock</th><th>Precio/kg</th><th>Estado</th></tr>
-              </thead>
-              <tbody>
-                {lotes.map((l: any) => (
-                  <tr key={l.idlote_cafe}>
-                    <td style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>{l.idlote_cafe}</td>
-                    <td><strong style={{ color: 'var(--text)' }}>{l.variedad}</strong></td>
-                    <td>{l.finca?.nombre ?? '—'}</td>
-                    <td><strong style={{ color: 'var(--primary)', fontSize: '1rem' }}>{Number(l.peso_kg).toLocaleString('es-CO')} kg</strong><br /><span style={{ fontSize: '0.8rem', color: 'var(--amber)', fontWeight: 700 }}>📦 {(l.peso_kg / 70).toFixed(2)} bts</span></td>
-                    <td>${Number(l.precio_kg ?? 0).toLocaleString('es-CO')}</td>
-                    <td><span className={`badge ${estadoBadge[l.estado] ?? 'badge-muted'}`}>{l.estado?.replace('_', ' ')}</span></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <OperadorLotes lotes={lotes} />
         ) : tab === 'movimientos' ? (
-          <div className="data-table-wrap table-responsive">
-            <table className="data-table">
-              <thead>
-                <tr><th>Tipo</th><th>Lote</th><th>Cantidad</th><th>Origen</th><th>Destino</th><th>Fecha</th><th>Notas</th></tr>
-              </thead>
-              <tbody>
-                {movimientos.map((m: any) => (
-                  <tr key={m.idmovimiento_inventario}>
-                    <td><span className={`badge ${tipoBadge[m.tipo] ?? 'badge-muted'}`}>{m.tipo}</span></td>
-                    <td>{m.lote_cafe?.variedad ?? '—'}</td>
-                    <td><strong style={{ color: 'var(--primary)' }}>{m.cantidad} kg</strong></td>
-                    <td>{m.almacen_origen?.nombre ?? '—'}</td>
-                    <td>{m.almacen_destino?.nombre ?? '—'}</td>
-                    <td style={{ fontSize: '0.78rem' }}>{new Date(m.fecha_movimiento).toLocaleDateString('es-CO')}</td>
-                    <td style={{ fontSize: '0.76rem', maxWidth: 160 }}>{m.notas ? String(m.notas).slice(0, 50) + (m.notas.length > 50 ? '…' : '') : '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <OperadorMovimientos movimientos={movimientos} />
         ) : (
-          <div className="data-table-wrap table-responsive">
-            <table className="data-table">
-              <thead>
-                <tr><th>Proceso</th><th>Lote</th><th>Kg lote</th><th>Inicio</th><th>Fin</th><th>Notas</th></tr>
-              </thead>
-              <tbody>
-                {registros.map((r: any) => (
-                  <tr key={r.idregistro_proceso}>
-                    <td><span className="badge badge-amber">{r.proceso?.nombre ?? '—'}</span></td>
-                    <td><strong style={{ color: 'var(--text)' }}>{r.lote_cafe?.variedad ?? '—'}</strong></td>
-                    <td>{r.lote_cafe?.peso_kg ? <><strong style={{ color: 'var(--primary)', fontSize: '1rem' }}>{Number(r.lote_cafe.peso_kg).toLocaleString('es-CO')} kg</strong><br /><span style={{ fontSize: '0.8rem', color: 'var(--amber)', fontWeight: 700 }}>📦 {(r.lote_cafe.peso_kg / 70).toFixed(2)} bts</span></> : '—'}</td>
-                    <td style={{ fontSize: '0.78rem' }}>{new Date(r.fecha_inicio).toLocaleDateString('es-CO')}</td>
-                    <td style={{ fontSize: '0.78rem' }}>{new Date(r.fecha_fin).toLocaleDateString('es-CO')}</td>
-                    <td style={{ fontSize: '0.76rem', maxWidth: 200 }}>{r.notas ? String(r.notas).slice(0, 60) + (r.notas.length > 60 ? '…' : '') : '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <OperadorProcesos registros={registros} />
         )}
       </main>
     </div>
+  )
+}
+
+// ── Lotes with filters ─────────────────────────────────────────────────────────
+function OperadorLotes({ lotes }: { lotes: any[] }) {
+  const [busqueda, setBusqueda] = React.useState('')
+  const [filtroEstado, setFiltroEstado] = React.useState('')
+  const [showF, setShowF] = React.useState(false)
+
+  const estadoBadge: Record<string, string> = { disponible: 'badge-green', en_proceso: 'badge-amber', vendido: 'badge-blue', exportado: 'badge-purple' }
+
+  const filtrados = lotes.filter(l => {
+    const q = busqueda.toLowerCase()
+    return (!busqueda || l.variedad.toLowerCase().includes(q) || (l.finca?.nombre ?? '').toLowerCase().includes(q))
+      && (!filtroEstado || l.estado === filtroEstado)
+  })
+
+  return (
+    <>
+      <div className="toolbar-v2">
+        <div className="toolbar-search" style={{ flex: 1 }}>
+          <span className="search-icon">🔍</span>
+          <input type="text" placeholder="Buscar variedad o finca…" value={busqueda} onChange={e => setBusqueda(e.target.value)} />
+        </div>
+        <button className="btn btn-secondary btn-sm" onClick={() => setShowF(v => !v)} style={{ display:'flex', alignItems:'center', gap:'0.3rem' }}>
+          ⚙ Filtros {filtroEstado && <span className="filter-badge">1</span>}
+        </button>
+        {(busqueda || filtroEstado) && <button className="filter-clear" onClick={() => { setBusqueda(''); setFiltroEstado('') }}>✕ Limpiar</button>}
+        <span className="toolbar-count">{filtrados.length} lote{filtrados.length !== 1 ? 's' : ''}</span>
+      </div>
+      {showF && (
+        <div className="filter-bar">
+          <div className="filter-row">
+            <span className="filter-label">Estado</span>
+            <div className="filter-chips">
+              {[{v:'',l:'Todos'},{v:'disponible',l:'✅ Disponible'},{v:'en_proceso',l:'⚙ En proceso'},{v:'vendido',l:'💰 Vendido'},{v:'exportado',l:'✈ Exportado'}]
+                .map(o => <button key={o.v} className={`filter-chip${filtroEstado===o.v?' active':''}`} onClick={() => setFiltroEstado(o.v)}>{o.l}</button>)}
+            </div>
+          </div>
+        </div>
+      )}
+      {filtrados.length === 0
+        ? <div className="empty-state"><div className="empty-icon">☕</div><p>Sin lotes con esos filtros.</p></div>
+        : (
+          <div style={{ display:'flex', flexDirection:'column', gap:'0.4rem' }}>
+            {filtrados.map((l: any) => (
+              <div key={l.idlote_cafe} className="record-card" style={{ display:'flex', alignItems:'center', gap:'1rem', flexWrap:'wrap', padding:'0.65rem 1rem' }}>
+                <div style={{ flex:'1 1 160px' }}>
+                  <div style={{ fontWeight:700, color:'var(--text)', fontSize:'0.9rem' }}>{l.variedad}</div>
+                  <div style={{ fontSize:'0.73rem', color:'var(--text-dim)' }}>🌿 {l.finca?.nombre ?? '—'}</div>
+                </div>
+                <div style={{ display:'flex', gap:'1.5rem', flexWrap:'wrap', alignItems:'center' }}>
+                  <div className="record-field">
+                    <span className="record-field-label">Stock</span>
+                    <span className="record-field-value" style={{ color:'var(--primary)' }}>{Number(l.peso_kg).toLocaleString('es-CO')} kg</span>
+                  </div>
+                  <div className="record-field">
+                    <span className="record-field-label">Bultos</span>
+                    <span className="record-field-value" style={{ color:'var(--amber)' }}>📦 {(l.peso_kg/70).toFixed(2)}</span>
+                  </div>
+                  <div className="record-field">
+                    <span className="record-field-label">Precio/kg</span>
+                    <span className="record-field-value">${Number(l.precio_kg??0).toLocaleString('es-CO')}</span>
+                  </div>
+                  <span className={`badge ${estadoBadge[l.estado]??'badge-muted'}`}>{l.estado?.replace('_',' ')}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )
+      }
+    </>
+  )
+}
+
+// ── Movimientos with filters ───────────────────────────────────────────────────
+function OperadorMovimientos({ movimientos }: { movimientos: any[] }) {
+  const [busqueda, setBusqueda] = React.useState('')
+  const [filtroTipo, setFiltroTipo] = React.useState('')
+  const [showF, setShowF] = React.useState(false)
+  const [page, setPage] = React.useState(1)
+  const PAGE = 15
+  const tipoBadge: Record<string,string> = { entrada:'badge-green', salida:'badge-red', traslado:'badge-blue' }
+
+  const filtrados = movimientos.filter(m => {
+    const q = busqueda.toLowerCase()
+    return (!busqueda || (m.lote_cafe?.variedad??'').toLowerCase().includes(q) || (m.almacen_origen?.nombre??'').toLowerCase().includes(q) || (m.almacen_destino?.nombre??'').toLowerCase().includes(q))
+      && (!filtroTipo || m.tipo === filtroTipo)
+  })
+  const totalPages = Math.max(1, Math.ceil(filtrados.length / PAGE))
+  const paged = filtrados.slice((page-1)*PAGE, page*PAGE)
+
+  return (
+    <>
+      <div className="toolbar-v2">
+        <div className="toolbar-search" style={{ flex:1 }}>
+          <span className="search-icon">🔍</span>
+          <input type="text" placeholder="Buscar lote, origen, destino…" value={busqueda} onChange={e => { setBusqueda(e.target.value); setPage(1) }} />
+        </div>
+        <button className="btn btn-secondary btn-sm" onClick={() => setShowF(v=>!v)} style={{ display:'flex', alignItems:'center', gap:'0.3rem' }}>
+          ⚙ Filtros {filtroTipo && <span className="filter-badge">1</span>}
+        </button>
+        {(busqueda||filtroTipo) && <button className="filter-clear" onClick={() => { setBusqueda(''); setFiltroTipo(''); setPage(1) }}>✕ Limpiar</button>}
+        <span className="toolbar-count">{filtrados.length} movimiento{filtrados.length!==1?'s':''}</span>
+      </div>
+      {showF && (
+        <div className="filter-bar">
+          <div className="filter-row">
+            <span className="filter-label">Tipo</span>
+            <div className="filter-chips">
+              {[{v:'',l:'Todos'},{v:'entrada',l:'📥 Entrada'},{v:'salida',l:'📤 Salida'},{v:'traslado',l:'🔄 Traslado'}]
+                .map(o => <button key={o.v} className={`filter-chip${filtroTipo===o.v?' active':''}`} onClick={() => { setFiltroTipo(o.v); setPage(1) }}>{o.l}</button>)}
+            </div>
+          </div>
+        </div>
+      )}
+      {filtrados.length === 0
+        ? <div className="empty-state"><div className="empty-icon">🔄</div><p>Sin movimientos con esos filtros.</p></div>
+        : (
+          <>
+            <div style={{ display:'flex', flexDirection:'column', gap:'0.4rem' }}>
+              {paged.map((m: any) => (
+                <div key={m.idmovimiento_inventario} className="record-card" style={{ display:'flex', alignItems:'center', gap:'1rem', flexWrap:'wrap', padding:'0.6rem 1rem' }}>
+                  <span className={`badge ${tipoBadge[m.tipo]??'badge-muted'}`} style={{ minWidth:68, justifyContent:'center', flexShrink:0 }}>
+                    {m.tipo==='entrada'?'📥':m.tipo==='salida'?'📤':'🔄'} {m.tipo}
+                  </span>
+                  <div style={{ flex:'1 1 140px' }}>
+                    <div style={{ fontWeight:700, color:'var(--text)', fontSize:'0.88rem' }}>{m.lote_cafe?.variedad??'—'}</div>
+                    <div style={{ fontSize:'0.72rem', color:'var(--text-dim)' }}>{new Date(m.fecha_movimiento).toLocaleDateString('es-CO',{day:'2-digit',month:'short',year:'numeric'})}</div>
+                  </div>
+                  <div style={{ display:'flex', gap:'1.25rem', flexWrap:'wrap', alignItems:'center' }}>
+                    <div className="record-field"><span className="record-field-label">Cantidad</span><span className="record-field-value" style={{ color:'var(--primary)' }}>{Number(m.cantidad).toLocaleString('es-CO')} kg</span></div>
+                    <div className="record-field"><span className="record-field-label">Origen</span><span className="record-field-value">{m.almacen_origen?.nombre??'—'}</span></div>
+                    <div className="record-field"><span className="record-field-label">Destino</span><span className="record-field-value">{m.almacen_destino?.nombre??'—'}</span></div>
+                    {m.notas && <div className="record-field" style={{ maxWidth:160 }}><span className="record-field-label">Notas</span><span className="record-field-value" style={{ fontWeight:400, fontSize:'0.74rem', color:'var(--text-muted)' }}>{String(m.notas).slice(0,50)}{m.notas.length>50?'…':''}</span></div>}
+                  </div>
+                </div>
+              ))}
+            </div>
+            {totalPages > 1 && (
+              <div className="pagination-bar">
+                <div className="pagination-info">{(page-1)*PAGE+1}–{Math.min(filtrados.length,page*PAGE)} de {filtrados.length}</div>
+                <div className="pagination-controls">
+                  <button className="page-btn page-btn-wide" disabled={page<=1} onClick={()=>setPage(p=>p-1)}>← Ant</button>
+                  {Array.from({length:totalPages},(_,i)=>i+1).filter(p=>p===1||p===totalPages||Math.abs(p-page)<=1)
+                    .reduce<(number|'…')[]>((acc,p,i,arr)=>{ if(i>0&&(p as number)-(arr[i-1] as number)>1)acc.push('…'); acc.push(p); return acc },[])
+                    .map((p,i)=> p==='…'?<span key={`e${i}`} className="page-ellipsis">…</span>
+                      :<button key={p} className={`page-btn${page===p?' active':''}`} onClick={()=>setPage(p as number)}>{p}</button>)}
+                  <button className="page-btn page-btn-wide" disabled={page>=totalPages} onClick={()=>setPage(p=>p+1)}>Sig →</button>
+                </div>
+              </div>
+            )}
+          </>
+        )
+      }
+    </>
+  )
+}
+
+// ── Procesos with filters ──────────────────────────────────────────────────────
+function OperadorProcesos({ registros }: { registros: any[] }) {
+  const [busqueda, setBusqueda] = React.useState('')
+  const [filtroProceso, setFiltroProceso] = React.useState('')
+  const [showF, setShowF] = React.useState(false)
+  const [expanded, setExpanded] = React.useState<number|null>(null)
+
+  const procesosUnicos = Array.from(new Set(registros.map(r => r.proceso?.nombre).filter(Boolean)))
+  const filtrados = registros.filter(r => {
+    const q = busqueda.toLowerCase()
+    return (!busqueda || (r.lote_cafe?.variedad??'').toLowerCase().includes(q) || (r.proceso?.nombre??'').toLowerCase().includes(q))
+      && (!filtroProceso || r.proceso?.nombre === filtroProceso)
+  })
+
+  const diffDias = (r: any) => {
+    if (!r.fecha_inicio || !r.fecha_fin) return null
+    const h = (new Date(r.fecha_fin).getTime() - new Date(r.fecha_inicio).getTime()) / 36e5
+    return h < 24 ? `${Math.round(h)}h` : `${Math.round(h/24)}d`
+  }
+
+  return (
+    <>
+      <div className="toolbar-v2">
+        <div className="toolbar-search" style={{ flex:1 }}>
+          <span className="search-icon">🔍</span>
+          <input type="text" placeholder="Buscar lote o proceso…" value={busqueda} onChange={e => setBusqueda(e.target.value)} />
+        </div>
+        {procesosUnicos.length > 0 && (
+          <button className="btn btn-secondary btn-sm" onClick={() => setShowF(v=>!v)} style={{ display:'flex', alignItems:'center', gap:'0.3rem' }}>
+            ⚙ Filtros {filtroProceso && <span className="filter-badge">1</span>}
+          </button>
+        )}
+        {(busqueda||filtroProceso) && <button className="filter-clear" onClick={() => { setBusqueda(''); setFiltroProceso('') }}>✕ Limpiar</button>}
+        <span className="toolbar-count">{filtrados.length} registro{filtrados.length!==1?'s':''}</span>
+      </div>
+      {showF && procesosUnicos.length > 0 && (
+        <div className="filter-bar">
+          <div className="filter-row">
+            <span className="filter-label">Proceso</span>
+            <div className="filter-chips">
+              <button className={`filter-chip${filtroProceso===''?' active':''}`} onClick={() => setFiltroProceso('')}>Todos</button>
+              {procesosUnicos.map(p => (
+                <button key={p} className={`filter-chip chip-amber${filtroProceso===p?' active':''}`} onClick={() => setFiltroProceso(p)}>{p}</button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+      {filtrados.length === 0
+        ? <div className="empty-state"><div className="empty-icon">⚙️</div><p>Sin registros con esos filtros.</p></div>
+        : (
+          <div style={{ display:'flex', flexDirection:'column', gap:'0.35rem' }}>
+            {filtrados.map((r: any) => {
+              const isOpen = expanded === r.idregistro_proceso
+              const dur = diffDias(r)
+              return (
+                <div key={r.idregistro_proceso} style={{ background:'var(--bg-card)', border:`1px solid ${isOpen?'var(--primary)':'var(--border-soft)'}`, borderRadius:'var(--r-lg)', overflow:'hidden', transition:'border-color 0.15s' }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:'0.75rem', padding:'0.55rem 0.9rem', cursor:'pointer', flexWrap:'wrap' }}
+                    onClick={() => setExpanded(isOpen ? null : r.idregistro_proceso)}>
+                    <span className="badge badge-amber" style={{ fontSize:'0.65rem', padding:'0.1rem 0.4rem', flexShrink:0 }}>{r.proceso?.nombre??'—'}</span>
+                    <span style={{ fontWeight:700, color:'var(--text)', fontSize:'0.86rem', flex:1, minWidth:100 }}>☕ {r.lote_cafe?.variedad??'—'}</span>
+                    <span style={{ fontSize:'0.78rem', color:'var(--text-dim)' }}>{new Date(r.fecha_inicio).toLocaleDateString('es-CO',{day:'2-digit',month:'short',year:'numeric'})}</span>
+                    {dur && <span className="badge badge-blue" style={{ fontSize:'0.62rem' }}>{dur}</span>}
+                    <span style={{ marginLeft:'auto', color:'var(--text-muted)', fontSize:'0.75rem' }}>{isOpen?'▲':'▼'}</span>
+                  </div>
+                  {isOpen && (
+                    <div style={{ borderTop:'1px solid var(--border-soft)', padding:'0.65rem 0.9rem', background:'var(--bg-1)' }}>
+                      <div style={{ display:'flex', gap:'1.5rem', flexWrap:'wrap', marginBottom:'0.3rem' }}>
+                        <div className="record-field"><span className="record-field-label">Inicio</span><span className="record-field-value">{new Date(r.fecha_inicio).toLocaleDateString('es-CO',{dateStyle:'medium'})}</span></div>
+                        <div className="record-field"><span className="record-field-label">Fin</span><span className="record-field-value">{r.fecha_fin ? new Date(r.fecha_fin).toLocaleDateString('es-CO',{dateStyle:'medium'}) : '—'}</span></div>
+                        {r.lote_cafe?.peso_kg && <div className="record-field"><span className="record-field-label">Kg lote</span><span className="record-field-value">{Number(r.lote_cafe.peso_kg).toLocaleString('es-CO')} kg</span></div>}
+                      </div>
+                      {r.notas && <div style={{ fontSize:'0.77rem', color:'var(--text-dim)', marginTop:'0.2rem' }}>📝 {r.notas}</div>}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )
+      }
+    </>
   )
 }

@@ -1,4 +1,5 @@
 'use client'
+import React from 'react'
 import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '../../utils/supabase/client'
 
@@ -141,48 +142,11 @@ function PortalVendedor({ usuario, onLogout }: { usuario: UsuarioPortal; onLogou
         {loading ? (
           <div className="loading-center"><div className="spinner" /><span>Cargando…</span></div>
         ) : tab === 'ventas' ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-            {ventas.length === 0 ? (
-              <div className="empty-state"><div className="empty-icon">💰</div><p>No hay ventas registradas aún.</p></div>
-            ) : ventas.map((v: any) => (
-              <div key={v.idventa} className="venta-card">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                  <div>
-                    <div style={{ fontWeight: 700, color: 'var(--text)', fontSize: '0.92rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      Venta #{v.idventa} <span className="badge badge-green">✓</span>
-                    </div>
-                    <div style={{ color: 'var(--text-dim)', fontSize: '0.76rem', marginTop: '0.1rem' }}>
-                      {new Date(v.fecha_venta).toLocaleDateString('es-CO', { dateStyle: 'long' })}
-                    </div>
-                    <div style={{ fontSize: '0.76rem', color: 'var(--text-soft)', marginTop: '0.15rem' }}>
-                      🤝 {v.cliente?.nombre ?? 'Sin cliente'}{v.cliente?.email ? ` · ${v.cliente.email}` : ''}
-                    </div>
-                  </div>
-                  <div style={{ textAlign: 'right' }}>
-                    {(() => {
-                      const kgV = (v.detalle_venta ?? []).reduce((s: number, d: any) => s + d.cantidad, 0)
-                      const copV = (v.detalle_venta ?? []).reduce((s: number, d: any) => s + d.cantidad * d.precio_venta, 0)
-                      return <>
-                        <div style={{ fontWeight: 800, color: 'var(--primary)', fontSize: '1rem' }}>${copV.toLocaleString('es-CO')} COP</div>
-                        <div style={{ fontSize: '0.78rem', color: 'var(--text-dim)', fontWeight: 600 }}>{kgV} kg</div>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--amber)', fontWeight: 700 }}>📦 {(kgV / 70).toFixed(2)} bultos</div>
-                      </>
-                    })()}
-                  </div>
-                </div>
-                {(v.detalle_venta ?? []).length > 0 && (
-                  <div style={{ borderTop: '1px solid var(--border-soft)', paddingTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-                    {v.detalle_venta.map((d: any, i: number) => (
-                      <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: 'var(--text-soft)' }}>
-                        <span>☕ {d.lote_cafe?.variedad ?? '—'}</span>
-                        <span style={{ fontWeight: 600 }}>{d.cantidad} kg — ${(d.cantidad * d.precio_venta).toLocaleString('es-CO')}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
+          ventas.length === 0 ? (
+            <div className="empty-state"><div className="empty-icon">💰</div><p>No hay ventas registradas aún.</p></div>
+          ) : (
+            <VentasCompactas ventas={ventas} />
+          )
         ) : tab === 'lotes' ? (
           <div className="data-table-wrap table-responsive">
             <table className="data-table">
@@ -230,5 +194,84 @@ function PortalVendedor({ usuario, onLogout }: { usuario: UsuarioPortal; onLogou
         )}
       </main>
     </div>
+  )
+}
+
+// ── Compact expandable venta list ──────────────────────────────────────────────
+function VentasCompactas({ ventas }: { ventas: any[] }) {
+  const [expandedId, setExpandedId] = React.useState<number | null>(null)
+  const [page, setPage] = React.useState(1)
+  const PAGE = 15
+  const totalPages = Math.max(1, Math.ceil(ventas.length / PAGE))
+  const paged = ventas.slice((page - 1) * PAGE, page * PAGE)
+
+  return (
+    <>
+      <div className="summary-strip" style={{ marginBottom: '0.65rem' }}>
+        <div className="summary-item"><span>Total:</span><strong>{ventas.length} ventas</strong></div>
+        <div className="summary-item" style={{ marginLeft: 'auto', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+          Clic en una fila para ver detalle
+        </div>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+        {paged.map((v: any) => {
+          const expanded = expandedId === v.idventa
+          const kgV  = (v.detalle_venta ?? []).reduce((s: number, d: any) => s + d.cantidad, 0)
+          const copV = (v.detalle_venta ?? []).reduce((s: number, d: any) => s + d.cantidad * d.precio_venta, 0)
+          return (
+            <div key={v.idventa} style={{
+              background: 'var(--bg-card)',
+              border: `1px solid ${expanded ? 'var(--primary)' : 'var(--border-soft)'}`,
+              borderRadius: 'var(--r-lg)', overflow: 'hidden', transition: 'border-color 0.15s',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.55rem 0.9rem', cursor: 'pointer', flexWrap: 'wrap' }}
+                onClick={() => setExpandedId(expanded ? null : v.idventa)}>
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 700, minWidth: 28 }}>#{v.idventa}</span>
+                <span className="badge badge-green" style={{ fontSize: '0.62rem', padding: '0.1rem 0.45rem' }}>✓</span>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-soft)', flex: 1, minWidth: 80 }}>
+                  {new Date(v.fecha_venta).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })}
+                </span>
+                <span style={{ fontSize: '0.78rem', color: 'var(--text-soft)' }}>🤝 {v.cliente?.nombre ?? '—'}</span>
+                <span style={{ fontSize: '0.82rem', color: 'var(--text-dim)' }}>{kgV} kg</span>
+                <span style={{ fontSize: '0.82rem', color: 'var(--primary)', fontWeight: 700 }}>${copV.toLocaleString('es-CO')}</span>
+                <span style={{ marginLeft: 'auto', color: 'var(--text-muted)', fontSize: '0.75rem' }}>{expanded ? '▲' : '▼'}</span>
+              </div>
+              {expanded && (
+                <div style={{ borderTop: '1px solid var(--border-soft)', padding: '0.65rem 0.9rem', background: 'var(--bg-1)' }}>
+                  <div style={{ display: 'flex', gap: '1.5rem', marginBottom: '0.4rem', flexWrap: 'wrap' }}>
+                    <div className="record-field">
+                      <span className="record-field-label">Email cliente</span>
+                      <span className="record-field-value">{v.cliente?.email ?? '—'}</span>
+                    </div>
+                    <div className="record-field">
+                      <span className="record-field-label">Bultos</span>
+                      <span className="record-field-value" style={{ color: 'var(--amber)' }}>📦 {(kgV / 70).toFixed(2)}</span>
+                    </div>
+                  </div>
+                  {(v.detalle_venta ?? []).map((d: any, i: number) => (
+                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: 'var(--text-soft)', padding: '0.12rem 0' }}>
+                      <span>☕ {d.lote_cafe?.variedad ?? '—'}</span>
+                      <span style={{ fontWeight: 600 }}>{d.cantidad} kg — ${(d.cantidad * d.precio_venta).toLocaleString('es-CO')}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+      {totalPages > 1 && (
+        <div className="pagination-bar">
+          <div className="pagination-info">{(page-1)*PAGE+1}–{Math.min(ventas.length, page*PAGE)} de {ventas.length}</div>
+          <div className="pagination-controls">
+            <button className="page-btn page-btn-wide" disabled={page<=1} onClick={() => setPage(p=>p-1)}>← Ant</button>
+            {Array.from({length: totalPages},(_,i)=>i+1).map(p=>(
+              <button key={p} className={`page-btn${page===p?' active':''}`} onClick={()=>setPage(p)}>{p}</button>
+            ))}
+            <button className="page-btn page-btn-wide" disabled={page>=totalPages} onClick={() => setPage(p=>p+1)}>Sig →</button>
+          </div>
+        </div>
+      )}
+    </>
   )
 }

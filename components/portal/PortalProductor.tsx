@@ -32,8 +32,15 @@ export default function PortalProductor({ usuario }: { usuario: UsuarioPortal })
 
   const cargar = useCallback(async () => {
     setLoading(true)
+    // Buscar productor por nombre exacto primero, luego por contacto/email
     let { data: prod } = await supabase.from('productor').select('idproductor')
-      .or(`nombre.ilike.${usuario.nombre},contacto.ilike.${usuario.email}`).maybeSingle()
+      .eq('nombre', usuario.nombre).maybeSingle()
+
+    if (!prod) {
+      const { data: byContacto } = await supabase.from('productor').select('idproductor')
+        .eq('contacto', usuario.email).maybeSingle()
+      prod = byContacto
+    }
 
     if (!prod) {
       const { data: nuevo } = await supabase.from('productor')

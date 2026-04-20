@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useCallback } from 'react'
 import { createClient } from '../../utils/supabase/client'
 
 interface UsuarioPortal { idusuario: number; nombre: string; email: string }
@@ -9,21 +9,39 @@ const PAGE_SIZE = 12
 export default function PortalCatador({ usuario }: { usuario: UsuarioPortal }) {
   const supabase = createClient()
   const [registros, setRegistros] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
+  const [lotes, setLotes]         = useState<any[]>([])
+  const [procesos, setProcesos]   = useState<any[]>([])
+  const [loading, setLoading]     = useState(true)
 
-  const [busqueda, setBusqueda] = useState('')
+  // Filters
+  const [busqueda, setBusqueda]         = useState('')
   const [filtroProceso, setFiltroProceso] = useState('')
-  const [showFilters, setShowFilters] = useState(false)
+  const [showFilters, setShowFilters]     = useState(false)
   const [page, setPage] = useState(1)
 
-  useEffect(() => {
-    supabase.from('registro_proceso').select(`
-      idregistro_proceso, fecha_inicio, fecha_fin, notas,
-      lote_cafe:idlote_cafe(variedad, peso_kg, finca:idfinca(nombre)),
-      proceso:idproceso(nombre)
-    `).order('fecha_inicio', { ascending: false })
-      .then(({ data }) => { setRegistros(data ?? []); setLoading(false) })
+  // New record form
+  const [showForm, setShowForm] = useState(false)
+  const [form, setForm] = useState({ idlote_cafe: '', idproceso: '', fecha_inicio: '', fecha_fin: '', notas: '' })
+  const [saving, setSaving]   = useState(false)
+  const [formError, setFormError] = useState<string | null>(null)
+
+  const cargar = useCallback(async () => {
+    const [regRes, lotesRes, procRes] = await Promise.all([
+      supabase.from('registro_proceso').select(`
+        idregistro_proceso, fecha_inicio, fecha_fin, notas,
+        lote_cafe:idlote_cafe(variedad, peso_kg, finca:idfinca(nombre)),
+        proceso:idproceso(nombre)
+      `).order('fecha_inicio', { ascending: false }),
+      supabase.from('lote_cafe').select('idlote_cafe, variedad, finca:idfinca(nombre)').order('variedad'),
+      supabase.from('proceso').select('idproceso, nombre').order('nombre'),
+    ])
+    setRegistros(regRes.data ?? [])
+    setLotes(lotesRes.data ?? [])
+    setProcesos(procRes.data ?? [])
+    setLoading(false)
   }, [supabase])
+
+  useEffect(() => { cargar() }, [cargar])
 
   const procesosUnicos = useMemo(() =>
     Array.from(new Set(registros.map(r => r.proceso?.nombre).filter(Boolean))), [registros])
@@ -51,22 +69,107 @@ export default function PortalCatador({ usuario }: { usuario: UsuarioPortal }) {
     return h < 24 ? `${Math.round(h)}h` : `${Math.round(h / 24)}d`
   }
 
+  const handleSave = async () => {
+    if (!form.idlote_cafe || !form.idproceso || !form.fecha_inicio || !form.fecha_fin) {
+      setFormError('Lote, proceso, inicio y fin son obligatorios.')
+      return
+    }
+    setSaving(true); setFormError(null)
+    const { error } = await supabase.from('registro_proceso').insert({
+      idlote_cafe: Number(form.idlote_cafe),
+      idproceso: Number(form.idproceso),
+      fecha_inicio: form.fecha_inicio,
+      fecha_fin: form.fecha_fin,
+      notas: form.notas || null,
+      idusuario: usuario.idusuario,
+    })
+    if (error) { setFormError(error.message); setSaving(false); return }
+    setForm({ idlote_cafe: '', idproceso: '', fecha_inicio: '', fecha_fin: '', notas: '' })
+    setShowForm(false)
+    await cargar()
+    setSaving(false)
+  }
+
   return (
     <div>
-      <div style={{ marginBottom: '1.5rem' }}>
-        <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.6rem', color: 'var(--text)', marginBottom: '0.2rem' }}>
-          Portal Catador
-        </h1>
-        <p style={{ color: 'var(--text-dim)', fontSize: '0.84rem' }}>
-          Registros de procesos de beneficio para evaluación.
-        </p>
+      <div style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
+        <div>
+          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.6rem', color: 'var(--text)', marginBottom: '0.2rem' }}>
+            Portal Catador
+          </h1>
+          <p style={{ color: 'var(--text-dim)', fontSize: '0.84rem' }}>
+            Registros de procesos de beneficio para evaluación.
+          </p>
+        </div>
+        <button className="btn btn-primary" onClick={() => { setShowForm(v => !v); setFormError(null) }}>
+          {showForm ? '✕ Cancelar' : '+ Nuevo registro'}
+        </button>
       </div>
+
+      {/* New record form */}
+      {showForm && (
+        <div style={{
+          background: 'var(--bg-card)', border: '1px solid var(--primary)', borderRadius: 'var(--r-xl)',
+          padding: '1.25rem', marginBottom: '1.5rem',
+        }}>
+          <div style={{ fontWeight: 700, color: 'var(--primary)', fontSize: '0.88rem', marginBottom: '1rem' }}>
+            🔬 Nuevo registro de proceso
+          </div>
+          {formError && <div className="alert alert-error" style={{ marginBottom: '0.75rem' }}>⚠ {formError}</div>}
+          <div className="form-grid-2">
+            <div className="form-group">
+              <label className="form-label">Lote de café <span className="form-required">*</span></label>
+              <select className="form-select" value={form.idlote_cafe}
+                onChange={e => setForm(p => ({ ...p, idlote_cafe: e.target.value }))}>
+                <option value="">— Seleccionar lote —</option>
+                {lotes.map((l: any) => (
+                  <option key={l.idlote_cafe} value={l.idlote_cafe}>
+                    {l.variedad}{l.finca?.nombre ? ` · ${l.finca.nombre}` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Proceso <span className="form-required">*</span></label>
+              <select className="form-select" value={form.idproceso}
+                onChange={e => setForm(p => ({ ...p, idproceso: e.target.value }))}>
+                <option value="">— Seleccionar proceso —</option>
+                {procesos.map((p: any) => (
+                  <option key={p.idproceso} value={p.idproceso}>{p.nombre}</option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Fecha inicio <span className="form-required">*</span></label>
+              <input type="datetime-local" className="form-input" value={form.fecha_inicio}
+                onChange={e => setForm(p => ({ ...p, fecha_inicio: e.target.value }))} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Fecha fin <span className="form-required">*</span></label>
+              <input type="datetime-local" className="form-input" value={form.fecha_fin}
+                onChange={e => setForm(p => ({ ...p, fecha_fin: e.target.value }))} />
+            </div>
+            <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+              <label className="form-label">Notas de evaluación</label>
+              <textarea className="form-textarea" value={form.notas}
+                onChange={e => setForm(p => ({ ...p, notas: e.target.value }))}
+                placeholder="Temperatura, pH, observaciones sensoriales, puntaje…" />
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '0.75rem' }}>
+            <button className="btn btn-secondary" onClick={() => setShowForm(false)} disabled={saving}>Cancelar</button>
+            <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
+              {saving ? '⏳ Guardando…' : '✓ Guardar registro'}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Stats */}
       <div className="stats-grid" style={{ marginBottom: '1.5rem' }}>
         {[
-          { icon: '📋', label: 'Total registros', val: registros.length,              color: 'var(--primary)' },
-          { icon: '🔬', label: 'Procesos únicos', val: procesosUnicos.length,         color: 'var(--blue)' },
+          { icon: '📋', label: 'Total registros', val: registros.length, color: 'var(--primary)' },
+          { icon: '🔬', label: 'Procesos únicos', val: procesosUnicos.length, color: 'var(--blue)' },
           { icon: '☕', label: 'Lotes evaluados', val: new Set(registros.map(r => r.lote_cafe?.variedad)).size, color: 'var(--amber)' },
         ].map(s => (
           <div key={s.label} className="stat-card" style={{ '--accent': s.color } as any}>
@@ -82,11 +185,10 @@ export default function PortalCatador({ usuario }: { usuario: UsuarioPortal }) {
       ) : registros.length === 0 ? (
         <div className="empty-state">
           <div className="empty-icon">🔬</div>
-          <p>No hay registros de proceso disponibles.</p>
+          <p>No hay registros de proceso. ¡Crea el primero!</p>
         </div>
       ) : (
         <>
-          {/* Toolbar */}
           <div className="toolbar-v2">
             <div className="toolbar-search" style={{ flex: 1, minWidth: 180 }}>
               <span className="search-icon">🔍</span>
@@ -130,12 +232,9 @@ export default function PortalCatador({ usuario }: { usuario: UsuarioPortal }) {
 
           {filtrados.length === 0 ? (
             <div className="empty-state">
-              <div className="empty-icon">🔍</div>
-              <p>Sin registros con esos filtros.</p>
+              <div className="empty-icon">🔍</div><p>Sin registros con esos filtros.</p>
               <button className="btn btn-secondary btn-sm" style={{ marginTop: '0.75rem' }}
-                onClick={() => { setBusqueda(''); setFiltroProceso(''); setPage(1) }}>
-                Limpiar filtros
-              </button>
+                onClick={() => { setBusqueda(''); setFiltroProceso(''); setPage(1) }}>Limpiar</button>
             </div>
           ) : (
             <>
@@ -178,11 +277,7 @@ export default function PortalCatador({ usuario }: { usuario: UsuarioPortal }) {
                         )}
                       </div>
                       {r.notas && (
-                        <div style={{
-                          marginTop: '0.65rem', paddingTop: '0.6rem',
-                          borderTop: '1px solid var(--border-soft)',
-                          fontSize: '0.77rem', color: 'var(--text-dim)', lineHeight: 1.5,
-                        }}>
+                        <div style={{ marginTop: '0.65rem', paddingTop: '0.6rem', borderTop: '1px solid var(--border-soft)', fontSize: '0.77rem', color: 'var(--text-dim)', lineHeight: 1.5 }}>
                           📝 {String(r.notas).slice(0, 120)}{r.notas.length > 120 ? '…' : ''}
                         </div>
                       )}
@@ -202,12 +297,10 @@ export default function PortalCatador({ usuario }: { usuario: UsuarioPortal }) {
                       .filter(p => p === 1 || p === totalPages || Math.abs(p - page) <= 1)
                       .reduce<(number | '…')[]>((acc, p, i, arr) => {
                         if (i > 0 && (p as number) - (arr[i - 1] as number) > 1) acc.push('…')
-                        acc.push(p)
-                        return acc
+                        acc.push(p); return acc
                       }, [])
                       .map((p, i) =>
-                        p === '…'
-                          ? <span key={`e${i}`} className="page-ellipsis">…</span>
+                        p === '…' ? <span key={`e${i}`} className="page-ellipsis">…</span>
                           : <button key={p} className={`page-btn${page === p ? ' active' : ''}`}
                               onClick={() => setPage(p as number)}>{p}</button>
                       )}
