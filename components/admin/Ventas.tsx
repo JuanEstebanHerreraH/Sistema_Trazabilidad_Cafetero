@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import { createClient } from '../../utils/supabase/client'
 import { useRead } from '../../hooks/useCrud'
 import CrudPage from '../../components/CrudPage'
@@ -26,11 +26,10 @@ export default function Ventas() {
   const supabase = createClient()
   const { data: clientes } = useRead('cliente', 'idcliente, nombre', 'nombre')
 
-  // Modal detalle
   const [detalleVenta, setDetalleVenta] = useState<VentaDetalle | null>(null)
   const [loadingDetalle, setLoadingDetalle] = useState(false)
 
-  const verDetalle = async (idventa: number) => {
+  const verDetalle = useCallback(async (idventa: number) => {
     setLoadingDetalle(true)
     setDetalleVenta(null)
     const { data } = await supabase
@@ -45,80 +44,61 @@ export default function Ventas() {
       .single()
     setDetalleVenta(data as any)
     setLoadingDetalle(false)
-  }
+  }, [supabase])
 
   const fields = [
-    {
-      key: 'fecha_venta', label: 'Fecha de venta', type: 'datetime-local', required: true,
-      description: 'Fecha y hora exacta en que se realizó o acordó la venta.',
-    },
+    { key: 'fecha_venta', label: 'Fecha de venta', type: 'datetime-local', required: true },
     {
       key: 'idcliente', label: 'Cliente comprador', type: 'select', required: true,
       options: clientes.map(c => ({ value: c.idcliente, label: c.nombre })),
-      description: 'Empresa o persona que compra el café. Gestiona clientes en la sección Clientes.',
     },
     { section: 'Detalles económicos' } as any,
-    {
-      key: 'total_kg', label: 'Total vendido (kg)', type: 'number', required: false,
-      step: '0.01', min: '0', placeholder: 'Ej: 500.00',
-      description: 'Kilogramos totales de café incluidos en esta venta.',
-    },
-    {
-      key: 'precio_kg', label: 'Precio por kg (COP)', type: 'number', required: false,
-      step: '1', min: '0', placeholder: 'Ej: 18500',
-      description: 'Precio pactado por kilogramo en pesos colombianos.',
-    },
+    { key: 'total_kg',  label: 'Total vendido (kg)',    type: 'number', required: false, step: '0.01', min: '0', placeholder: 'Ej: 500.00' },
+    { key: 'precio_kg', label: 'Precio por kg (COP)',   type: 'number', required: false, step: '1',    min: '0', placeholder: 'Ej: 18500' },
     { section: 'Información adicional' } as any,
-    {
-      key: 'notas', label: 'Notas', type: 'textarea', required: false, colSpan: 'full',
-      placeholder: 'Condiciones de pago, instrucciones de entrega, observaciones…',
-      description: 'Campo libre para observaciones, términos acordados o referencias.',
-    },
+    { key: 'notas', label: 'Notas', type: 'textarea', required: false, colSpan: 'full', placeholder: 'Condiciones de pago, instrucciones…' },
   ]
 
   return (
     <>
       <CrudPage
-        title="Ventas" subtitle="Registro de ventas de café a clientes" icon="💰"
+        title="Ventas" subtitle="Historial completo de transacciones comerciales" icon="💰"
         table="venta" idField="idventa"
         selectQuery="*, cliente(nombre)"
         orderBy="fecha_venta"
+        searchKeys={['notas', 'cliente.nombre']}
+        searchPlaceholder="Buscar por cliente o notas…"
         columns={[
-          { key: 'idventa',    label: '#', sortable: true },
-          { key: 'fecha_venta', label: 'Fecha', sortable: true, render: v => v ? new Date(v).toLocaleDateString('es-CO', { day:'2-digit', month:'short', year:'numeric' }) : '—' },
-          { key: 'idcliente',  label: 'Cliente', render: (_, r) => r.cliente?.nombre || '—' },
-          { key: 'total_kg',   label: 'Kg', sortable: true, render: v => v ? <strong>{Number(v).toLocaleString('es-CO')} kg</strong> : '—' },
-          { key: 'precio_kg',  label: 'Precio/kg', sortable: true, render: v => v ? `$${Number(v).toLocaleString('es-CO')}` : '—' },
+          { key: 'idventa',     label: '#',         sortable: true },
+          { key: 'fecha_venta', label: 'Fecha',      sortable: true, render: v => v ? new Date(v).toLocaleDateString('es-CO', { day:'2-digit', month:'short', year:'numeric' }) : '—' },
+          { key: 'idcliente',   label: 'Cliente',    render: (_, r) => r.cliente?.nombre || <span style={{color:'var(--text-muted)'}}>—</span> },
+          { key: 'total_kg',    label: 'Total Kg',   sortable: true, render: v => v ? <strong>{Number(v).toLocaleString('es-CO')} kg</strong> : '—' },
+          { key: 'precio_kg',   label: 'Precio/kg',  sortable: true, render: v => v ? `$${Number(v).toLocaleString('es-CO')}` : '—' },
           {
-            key: 'total_cop', label: 'Total $',
+            key: 'total_cop', label: 'Total COP',
             render: (_, r) => {
               const total = (r.total_kg ?? 0) * (r.precio_kg ?? 0)
-              return total > 0
-                ? <strong style={{ color: 'var(--green)' }}>${total.toLocaleString('es-CO')}</strong>
-                : '—'
+              return total > 0 ? <strong style={{ color: 'var(--green)' }}>${total.toLocaleString('es-CO')}</strong> : '—'
             }
           },
           {
-            key: 'detalle', label: 'Detalle',
+            key: 'items', label: 'Ítems',
             render: (_, r) => (
               <button className="btn btn-secondary btn-sm" onClick={(e) => { e.stopPropagation(); verDetalle(r.idventa) }}>
                 👁 Ver
               </button>
             ),
           },
-          { key: 'notas', label: 'Notas', render: v => v ? <span style={{color:'var(--text-dim)',fontSize:'0.8rem'}}>{String(v).slice(0,30)}{String(v).length>30?'…':''}</span> : '—' },
         ]}
         fields={fields}
-        searchKey="notas"
-        filterSelects={[
+        filterSelects={clientes.length > 0 ? [
           { key: 'idcliente', label: 'Cliente', options: clientes.map(c => ({ value: String(c.idcliente), label: c.nombre })) },
-        ]}
+        ] : []}
         dateFilters={[
           { key: 'fecha_venta', label: 'Fecha de venta' },
         ]}
       />
 
-      {/* Modal de Detalle de Venta */}
       <Modal
         isOpen={!!detalleVenta || loadingDetalle}
         onClose={() => { setDetalleVenta(null); setLoadingDetalle(false) }}
@@ -129,33 +109,25 @@ export default function Ventas() {
           <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-dim)' }}>Cargando detalles…</div>
         ) : detalleVenta ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            {/* Info de la venta */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-              <InfoBlock label="Cliente" value={detalleVenta.cliente?.nombre ?? '—'} />
-              <InfoBlock label="Fecha" value={new Date(detalleVenta.fecha_venta).toLocaleDateString('es-CO', { dateStyle: 'long' })} />
-              <InfoBlock label="Total kg" value={`${detalleVenta.total_kg ?? 0} kg`} />
+              <InfoBlock label="Cliente"   value={detalleVenta.cliente?.nombre ?? '—'} />
+              <InfoBlock label="Fecha"     value={new Date(detalleVenta.fecha_venta).toLocaleDateString('es-CO', { dateStyle: 'long' })} />
+              <InfoBlock label="Total kg"  value={`${detalleVenta.total_kg ?? 0} kg`} />
               <InfoBlock label="Precio/kg" value={`$${(detalleVenta.precio_kg ?? 0).toLocaleString('es-CO')}`} />
             </div>
-
-            {/* Total */}
             <div style={{ background: 'var(--green-bg)', borderRadius: 'var(--r-md)', padding: '0.75rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontWeight: 600, color: 'var(--green)', fontSize: '0.88rem' }}>Total de la venta:</span>
               <span style={{ fontWeight: 700, color: 'var(--green)', fontSize: '1.2rem' }}>
                 ${((detalleVenta.total_kg ?? 0) * (detalleVenta.precio_kg ?? 0)).toLocaleString('es-CO')} COP
               </span>
             </div>
-
-            {/* Items */}
             {detalleVenta.detalle_venta && detalleVenta.detalle_venta.length > 0 ? (
               <div>
                 <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-soft)', marginBottom: '0.5rem' }}>
                   📦 Lotes vendidos ({detalleVenta.detalle_venta.length} ítem{detalleVenta.detalle_venta.length > 1 ? 's' : ''}):
                 </div>
                 {detalleVenta.detalle_venta.map(d => (
-                  <div key={d.iddetalle_venta} style={{
-                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                    background: 'var(--bg)', borderRadius: 'var(--r-md)', padding: '0.6rem 0.8rem', marginBottom: '0.4rem',
-                  }}>
+                  <div key={d.iddetalle_venta} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg)', borderRadius: 'var(--r-md)', padding: '0.6rem 0.8rem', marginBottom: '0.4rem' }}>
                     <div>
                       <span style={{ fontWeight: 600, color: 'var(--text)' }}>☕ {d.lote_cafe?.variedad ?? '—'}</span>
                       {d.lote_cafe?.finca && <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginLeft: '0.4rem' }}>· {d.lote_cafe.finca.nombre}</span>}
@@ -163,9 +135,7 @@ export default function Ventas() {
                     </div>
                     <div style={{ textAlign: 'right' }}>
                       <div style={{ fontWeight: 700, color: 'var(--primary)' }}>{d.cantidad} kg</div>
-                      <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>
-                        ${(d.cantidad * d.precio_venta).toLocaleString('es-CO')}
-                      </div>
+                      <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>${(d.cantidad * d.precio_venta).toLocaleString('es-CO')}</div>
                     </div>
                   </div>
                 ))}
@@ -173,11 +143,8 @@ export default function Ventas() {
             ) : (
               <div style={{ textAlign: 'center', padding: '1rem', color: 'var(--text-dim)', background: 'var(--bg)', borderRadius: 'var(--r-md)' }}>
                 📝 Venta creada manualmente (sin ítems de detalle).
-                <br /><span style={{ fontSize: '0.76rem' }}>Las compras del portal generan detalles automáticamente.</span>
               </div>
             )}
-
-            {/* Notas */}
             {detalleVenta.notas && (
               <div style={{ fontSize: '0.82rem', color: 'var(--text-soft)', borderTop: '1px solid var(--border-soft)', paddingTop: '0.6rem' }}>
                 📝 {detalleVenta.notas}

@@ -27,26 +27,14 @@ export default function LotesCafe() {
     {
       key: 'idfinca', label: 'Finca de origen', type: 'select', required: true,
       options: fincas.map(f => ({ value: f.idfinca, label: f.nombre })),
-      description: 'Finca donde se cosechó este lote. Registra fincas en la sección "Fincas".',
+      description: 'Finca donde se cosechó este lote.',
     },
     { section: 'Datos de cosecha' } as any,
-    {
-      key: 'fecha_cosecha', label: 'Fecha de cosecha', type: 'date', required: true,
-      description: 'Día en que se recolectó el café en la finca.',
-    },
-    {
-      key: 'peso_kg', label: 'Peso / Stock (kg)', type: 'number', required: true, step: '0.01', min: '0', placeholder: 'Ej: 2500.00',
-      description: 'Peso en kilogramos disponible.',
-    },
+    { key: 'fecha_cosecha', label: 'Fecha de cosecha', type: 'date', required: true },
+    { key: 'peso_kg',       label: 'Peso / Stock (kg)', type: 'number', required: true, step: '0.01', min: '0', placeholder: 'Ej: 2500.00' },
     { section: 'Precio y estado' } as any,
-    {
-      key: 'precio_kg', label: 'Precio por kg (COP)', type: 'number', required: true, step: '0.01', min: '0', placeholder: 'Ej: 18500',
-      description: 'Precio fijo por kilogramo en pesos colombianos.',
-    },
-    {
-      key: 'estado', label: 'Estado del lote', type: 'select', required: true, options: ESTADOS,
-      description: 'Disponible: listo para venta. En proceso: siendo beneficiado. Vendido/Exportado: ya despachado.',
-    },
+    { key: 'precio_kg',     label: 'Precio por kg (COP)', type: 'number', required: true, step: '0.01', min: '0', placeholder: 'Ej: 18500' },
+    { key: 'estado',        label: 'Estado del lote', type: 'select', required: true, options: ESTADOS },
   ]
 
   return (
@@ -55,20 +43,22 @@ export default function LotesCafe() {
       table="lote_cafe" idField="idlote_cafe"
       selectQuery="*, finca(nombre, ubicacion, productor(nombre))"
       orderBy="fecha_cosecha"
+      searchKeys={['variedad', 'finca.nombre', 'finca.productor.nombre']}
+      searchPlaceholder="Buscar variedad, finca o productor…"
       columns={[
-        { key: 'idlote_cafe',   label: '#', sortable: true },
-        { key: 'variedad',      label: 'Variedad', sortable: true },
-        { key: 'idfinca',       label: 'Finca',      render: (_, r) => r.finca?.nombre || '—' },
-        { key: 'productor',     label: 'Productor',  render: (_, r) => <span style={{color:'var(--text-dim)',fontSize:'0.82rem'}}>{r.finca?.productor?.nombre || '—'}</span> },
-        { key: 'fecha_cosecha', label: 'Cosecha', sortable: true, render: v => v ? new Date(v).toLocaleDateString('es-CO',{day:'2-digit',month:'short',year:'numeric'}) : '—' },
-        { key: 'peso_kg',       label: 'Stock', sortable: true, render: v => <strong>{Number(v).toLocaleString('es-CO')} kg</strong> },
+        { key: 'idlote_cafe',   label: '#',         sortable: true },
+        { key: 'variedad',      label: 'Variedad',  sortable: true },
+        { key: 'idfinca',       label: 'Finca',     sortable: true, render: (_, r) => r.finca?.nombre || '—' },
+        { key: 'productor',     label: 'Productor', render: (_, r) => <span style={{color:'var(--text-dim)',fontSize:'0.82rem'}}>{r.finca?.productor?.nombre || '—'}</span> },
+        { key: 'fecha_cosecha', label: 'Cosecha',   sortable: true, render: v => v ? new Date(v).toLocaleDateString('es-CO',{day:'2-digit',month:'short',year:'numeric'}) : '—' },
+        { key: 'peso_kg',       label: 'Stock',     sortable: true, render: v => <strong>{Number(v).toLocaleString('es-CO')} kg</strong> },
         { key: 'precio_kg',     label: 'Precio/kg', sortable: true, render: v => <span style={{color:'var(--primary)',fontWeight:600}}>${Number(v ?? 0).toLocaleString('es-CO')}</span> },
-        { key: 'estado',        label: 'Estado',     render: v => <span className={`badge ${estadoBadge[v]??'badge-amber'}`}>{v?.replace('_',' ')}</span> },
+        { key: 'estado',        label: 'Estado',    render: v => <span className={`badge ${estadoBadge[v]??'badge-amber'}`}>{v?.replace('_',' ')}</span> },
       ]}
       fields={fields}
-      searchKey="variedad"
       filterSelects={[
-        { key: 'estado', label: 'Estado', options: ESTADOS.map(e => ({ value: e.value, label: e.label })) },
+        { key: 'estado', label: 'Estado', options: ESTADOS },
+        ...(fincas.length > 0 ? [{ key: 'idfinca', label: 'Finca', options: fincas.map(f => ({ value: String(f.idfinca), label: f.nombre })) }] : []),
       ]}
       dateFilters={[
         { key: 'fecha_cosecha', label: 'Fecha cosecha' },

@@ -48,6 +48,8 @@ interface CrudPageProps {
   columns: Column[]
   fields: Field[]
   searchKey?: string
+  searchKeys?: string[]          // ← NEW: multi-field search with dot notation
+  searchPlaceholder?: string     // ← NEW: custom placeholder
   extraActions?: (row: any) => ReactNode
   filterSelects?: FilterSelect[]
   dateFilters?: DateRangeFilter[]
@@ -58,7 +60,8 @@ type SortDir = 'asc' | 'desc' | null
 export default function CrudPage({
   title, subtitle, icon, table, idField,
   selectQuery = '*', orderBy, columns, fields,
-  searchKey, extraActions, filterSelects, dateFilters,
+  searchKey, searchKeys, searchPlaceholder,
+  extraActions, filterSelects, dateFilters,
 }: CrudPageProps) {
   const { data, loading, error, insert, update, remove } = useCrud(table, idField, selectQuery, orderBy)
 
@@ -114,11 +117,19 @@ export default function CrudPage({
     setPage(1)
   }, [])
 
+  // helper: resolve dot-notation paths like "cliente.nombre" in a row
+  const getVal = (row: any, path: string): string => {
+    const v = path.split('.').reduce((acc, k) => acc?.[k], row)
+    return String(v ?? '').toLowerCase()
+  }
+
+  const allSearchKeys: string[] = searchKeys ?? (searchKey ? [searchKey] : [])
+
   const filtered = useMemo(() => {
     let result = data
-    if (search && searchKey) {
+    if (search && allSearchKeys.length > 0) {
       const q = search.toLowerCase()
-      result = result.filter(row => String(row[searchKey] ?? '').toLowerCase().includes(q))
+      result = result.filter(row => allSearchKeys.some(k => getVal(row, k).includes(q)))
     }
     filterSelects?.forEach(fs => {
       const val = filterValues[fs.key]
@@ -137,7 +148,8 @@ export default function CrudPage({
       })
     }
     return result
-  }, [data, search, searchKey, filterValues, filterSelects, dateFilters, dateFrom, dateTo, sortKey, sortDir])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data, search, filterValues, filterSelects, dateFilters, dateFrom, dateTo, sortKey, sortDir])
 
   const pageCount = Math.ceil(filtered.length / PAGE_SIZE)
   const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
@@ -266,10 +278,10 @@ export default function CrudPage({
       {/* ── Enhanced Filter Bar ── */}
       <div className="filter-bar">
         <div className="filter-row">
-          {searchKey && (
+          {(searchKey || (searchKeys && searchKeys.length > 0)) && (
             <div className="toolbar-search">
               <span className="search-icon">🔍</span>
-              <input type="text" placeholder="Buscar…" value={search}
+              <input type="text" placeholder={searchPlaceholder ?? 'Buscar…'} value={search}
                 onChange={e => { setSearch(e.target.value); resetPage() }} />
             </div>
           )}
