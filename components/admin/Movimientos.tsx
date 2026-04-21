@@ -45,7 +45,6 @@ export default function Movimientos() {
   const [filtroAlmacen, setFiltroAlmacen] = useState('')
   const [filtroDesde, setFiltroDesde] = useState('')
   const [filtroHasta, setFiltroHasta] = useState('')
-  const [panelOpen, setPanelOpen]     = useState(false)
   const [sortKey, setSortKey]         = useState<string | null>('fecha_movimiento')
   const [sortDir, setSortDir]         = useState<'asc' | 'desc'>('desc')
   const [page, setPage]               = useState(1)
@@ -106,14 +105,6 @@ export default function Movimientos() {
   }, [form.idalmacen_origen, form.tipo])
 
   // ── Computed filters ────────────────────────────────
-  const activeFilterCount = useMemo(() => {
-    let n = 0
-    if (filtroTipo) n++
-    if (filtroAlmacen) n++
-    if (filtroDesde || filtroHasta) n++
-    return n
-  }, [filtroTipo, filtroAlmacen, filtroDesde, filtroHasta])
-
   const clearAllFilters = () => {
     setSearch(''); setFiltroTipo(''); setFiltroAlmacen('')
     setFiltroDesde(''); setFiltroHasta(''); setPage(1)
@@ -244,18 +235,7 @@ export default function Movimientos() {
     return partes.join(' · ')
   }
 
-  // ── Active chips ────────────────────────────────────
-  const chips: { label: string; value: string; clear: () => void }[] = []
-  if (filtroTipo) chips.push({ label: 'Tipo', value: `${tipoIcon[filtroTipo]} ${filtroTipo}`, clear: () => setFiltroTipo('') })
-  if (filtroAlmacen) {
-    const alm = almacenes.find(a => a.idalmacen === Number(filtroAlmacen))
-    chips.push({ label: 'Almacén', value: alm?.nombre ?? filtroAlmacen, clear: () => setFiltroAlmacen('') })
-  }
-  if (filtroDesde || filtroHasta) {
-    const range = [filtroDesde && `desde ${filtroDesde}`, filtroHasta && `hasta ${filtroHasta}`].filter(Boolean).join(' ')
-    chips.push({ label: 'Fecha', value: range, clear: () => { setFiltroDesde(''); setFiltroHasta('') } })
-  }
-
+  // ── Render ──────────────────────────────────────────
   return (
     <div>
       {/* ── Header ── */}
@@ -272,78 +252,67 @@ export default function Movimientos() {
 
       {error && <div className="alert alert-error" style={{ marginBottom: '1rem' }}>⚠ {error}</div>}
 
-      {/* ── Filter Bar ── */}
-      <div className="filter-bar">
-        <div className="filter-row">
-          {/* Search */}
-          <div className="toolbar-search">
-            <span className="search-icon">🔍</span>
-            <input type="text" placeholder="Buscar por lote, almacén, notas…" value={search}
-              onChange={e => { setSearch(e.target.value); resetPage() }} />
-          </div>
-
-          {/* Tipo segmented */}
-          <div className="filter-segments">
-            {(['', 'entrada', 'salida', 'traslado'] as const).map(t => (
-              <button key={t || 'all'} className={`filter-seg${filtroTipo === t ? ' active' : ''}`}
-                onClick={() => { setFiltroTipo(t); resetPage() }}>
-                {t === '' ? 'Todos' : `${tipoIcon[t]} ${t.charAt(0).toUpperCase() + t.slice(1)}`}
-              </button>
-            ))}
-          </div>
-
-          {/* Advanced toggle */}
-          <button className={`btn-filter${panelOpen ? ' active' : ''}`}
-            onClick={() => setPanelOpen(p => !p)}>
-            <span>⚡ Más filtros</span>
-            {activeFilterCount > 0 && <span className="filter-badge">{activeFilterCount}</span>}
-          </button>
-
-          <span className="toolbar-count" style={{ marginLeft: 'auto' }}>
-            {filtered.length} mov.{data.length !== filtered.length && (
-              <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}> de {data.length}</span>
-            )}
-          </span>
+      {/* ── Filter Bar: always visible ── */}
+      <div style={{
+        display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end',
+        marginBottom: '0.85rem', background: 'var(--bg-card)',
+        border: '1px solid var(--border-soft)', borderRadius: 'var(--r-xl)', padding: '0.75rem 1rem',
+      }}>
+        {/* Search */}
+        <div style={{ flex: '2 1 200px', minWidth: 180, position: 'relative' }}>
+          <span style={{ position: 'absolute', left: '0.65rem', top: '50%', transform: 'translateY(-50%)', fontSize: '0.82rem', color: 'var(--text-muted)', pointerEvents: 'none' }}>🔍</span>
+          <input type="text" placeholder="Buscar por lote, almacén, notas…" value={search}
+            onChange={e => { setSearch(e.target.value); resetPage() }}
+            style={{ width: '100%', paddingLeft: '2rem', height: '36px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text)', fontSize: '0.82rem', fontFamily: 'var(--font-body)', outline: 'none', boxSizing: 'border-box' }}
+          />
         </div>
 
-        {/* Advanced panel */}
-        {panelOpen && (
-          <div className="filter-panel">
-            <div className="filter-group">
-              <span className="filter-label">🏭 Almacén (origen o destino)</span>
-              <select value={filtroAlmacen} onChange={e => { setFiltroAlmacen(e.target.value); resetPage() }}>
-                <option value="">Todos los almacenes</option>
-                {almacenes.map(a => <option key={a.idalmacen} value={a.idalmacen}>{a.nombre}</option>)}
-              </select>
-            </div>
-            <div className="filter-group" style={{ gridColumn: 'span 2' }}>
-              <span className="filter-label">📅 Rango de fechas</span>
-              <div className="filter-date-range">
-                <input type="date" value={filtroDesde} onChange={e => { setFiltroDesde(e.target.value); resetPage() }} />
-                <input type="date" value={filtroHasta} onChange={e => { setFiltroHasta(e.target.value); resetPage() }} />
-              </div>
-            </div>
-            {(filtroAlmacen || filtroDesde || filtroHasta) && (
-              <div className="filter-group" style={{ justifyContent: 'flex-end' }}>
-                <span className="filter-label">&nbsp;</span>
-                <button className="btn btn-ghost btn-sm" onClick={clearAllFilters}>✕ Limpiar todo</button>
-              </div>
-            )}
-          </div>
-        )}
+        {/* Tipo select */}
+        <div style={{ flex: '1 1 140px', minWidth: 130 }}>
+          <label style={{ display: 'block', fontSize: '0.62rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', marginBottom: '0.2rem' }}>Tipo</label>
+          <select value={filtroTipo} onChange={e => { setFiltroTipo(e.target.value); resetPage() }}
+            style={{ width: '100%', height: '36px', background: filtroTipo ? 'var(--primary-subtle)' : 'var(--bg-input)', border: filtroTipo ? '1px solid var(--primary)' : '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text)', fontSize: '0.8rem', fontFamily: 'var(--font-body)', padding: '0 0.5rem', outline: 'none' }}>
+            <option value="">Todos</option>
+            <option value="entrada">📥 Entrada</option>
+            <option value="salida">📤 Salida</option>
+            <option value="traslado">🔄 Traslado</option>
+          </select>
+        </div>
 
-        {/* Chips */}
-        {chips.length > 0 && (
-          <div className="filter-chips">
-            {chips.map(chip => (
-              <span key={chip.label} className="filter-chip">
-                <span style={{ color: 'var(--text-dim)', fontWeight: 500 }}>{chip.label}:</span> {chip.value}
-                <button className="filter-chip-remove" onClick={chip.clear}>✕</button>
-              </span>
-            ))}
-            <button className="filter-chips-clear" onClick={clearAllFilters}>Limpiar filtros</button>
+        {/* Almacén select */}
+        <div style={{ flex: '1 1 160px', minWidth: 150 }}>
+          <label style={{ display: 'block', fontSize: '0.62rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', marginBottom: '0.2rem' }}>Almacén</label>
+          <select value={filtroAlmacen} onChange={e => { setFiltroAlmacen(e.target.value); resetPage() }}
+            style={{ width: '100%', height: '36px', background: filtroAlmacen ? 'var(--primary-subtle)' : 'var(--bg-input)', border: filtroAlmacen ? '1px solid var(--primary)' : '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text)', fontSize: '0.8rem', fontFamily: 'var(--font-body)', padding: '0 0.5rem', outline: 'none' }}>
+            <option value="">Todos</option>
+            {almacenes.map(a => <option key={a.idalmacen} value={a.idalmacen}>{a.nombre}</option>)}
+          </select>
+        </div>
+
+        {/* Date range */}
+        <div style={{ flex: '1 1 240px', minWidth: 220 }}>
+          <label style={{ display: 'block', fontSize: '0.62rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', marginBottom: '0.2rem' }}>📅 Rango de fechas</label>
+          <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
+            <input type="date" value={filtroDesde} onChange={e => { setFiltroDesde(e.target.value); resetPage() }}
+              style={{ flex: 1, height: '36px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text)', fontSize: '0.78rem', fontFamily: 'var(--font-body)', padding: '0 0.4rem', outline: 'none' }} />
+            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>–</span>
+            <input type="date" value={filtroHasta} onChange={e => { setFiltroHasta(e.target.value); resetPage() }}
+              style={{ flex: 1, height: '36px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text)', fontSize: '0.78rem', fontFamily: 'var(--font-body)', padding: '0 0.4rem', outline: 'none' }} />
           </div>
-        )}
+        </div>
+
+        {/* Clear + count */}
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: '0.5rem', marginLeft: 'auto' }}>
+          {(search || filtroTipo || filtroAlmacen || filtroDesde || filtroHasta) && (
+            <button onClick={clearAllFilters}
+              style={{ height: '36px', padding: '0 0.75rem', background: 'transparent', border: '1px solid var(--border-soft)', borderRadius: 'var(--r-md)', color: 'var(--text-muted)', fontSize: '0.78rem', cursor: 'pointer' }}>
+              ✕ Limpiar
+            </button>
+          )}
+          <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', lineHeight: '36px' }}>
+            {filtered.length} mov.{data.length !== filtered.length && <span style={{ color: 'var(--text-dim)' }}> / {data.length}</span>}
+          </span>
+        </div>
       </div>
 
       {/* ── Table ── */}

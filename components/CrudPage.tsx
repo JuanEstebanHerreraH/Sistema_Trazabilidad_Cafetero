@@ -241,24 +241,10 @@ export default function CrudPage({
     return String(raw)
   }
 
-  const hasAdvancedFilters = (filterSelects && filterSelects.length > 0) || (dateFilters && dateFilters.length > 0)
-
-  const activeChips: { key: string; label: string; value: string; type: 'select' | 'date' }[] = []
-  filterSelects?.forEach(fs => {
-    const val = filterValues[fs.key]
-    if (val) {
-      const opt = fs.options.find(o => o.value === val)
-      activeChips.push({ key: fs.key, label: fs.label, value: opt?.label ?? val, type: 'select' })
-    }
-  })
-  dateFilters?.forEach(df => {
-    const from = dateFrom[df.key]
-    const to = dateTo[df.key]
-    if (from || to) {
-      const range = [from && `desde ${from}`, to && `hasta ${to}`].filter(Boolean).join(' ')
-      activeChips.push({ key: df.key, label: df.label, value: range, type: 'date' })
-    }
-  })
+  const hasAnySearch = !!(searchKey || (searchKeys && searchKeys.length > 0))
+  const hasSelects = filterSelects && filterSelects.length > 0
+  const hasDates = dateFilters && dateFilters.length > 0
+  const hasAnyFilter = hasAnySearch || hasSelects || hasDates
 
   return (
     <div>
@@ -275,77 +261,109 @@ export default function CrudPage({
 
       {error && <div className="alert alert-error" style={{ marginBottom: '1rem' }}>⚠ {error}</div>}
 
-      {/* ── Enhanced Filter Bar ── */}
-      <div className="filter-bar">
-        <div className="filter-row">
-          {(searchKey || (searchKeys && searchKeys.length > 0)) && (
-            <div className="toolbar-search">
-              <span className="search-icon">🔍</span>
-              <input type="text" placeholder={searchPlaceholder ?? 'Buscar…'} value={search}
-                onChange={e => { setSearch(e.target.value); resetPage() }} />
+      {/* ── FILTER BAR: always visible ── */}
+      {hasAnyFilter && (
+        <div style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: '0.5rem',
+          alignItems: 'flex-end',
+          marginBottom: '0.85rem',
+          background: 'var(--bg-card)',
+          border: '1px solid var(--border-soft)',
+          borderRadius: 'var(--r-xl)',
+          padding: '0.75rem 1rem',
+        }}>
+          {/* Search */}
+          {hasAnySearch && (
+            <div style={{ flex: '2 1 200px', minWidth: 180, position: 'relative' }}>
+              <span style={{ position: 'absolute', left: '0.65rem', top: '50%', transform: 'translateY(-50%)', fontSize: '0.82rem', color: 'var(--text-muted)', pointerEvents: 'none' }}>🔍</span>
+              <input
+                type="text"
+                placeholder={searchPlaceholder ?? 'Buscar…'}
+                value={search}
+                onChange={e => { setSearch(e.target.value); resetPage() }}
+                style={{
+                  width: '100%', paddingLeft: '2rem', height: '36px',
+                  background: 'var(--bg-input)', border: '1px solid var(--border)',
+                  borderRadius: 'var(--r-md)', color: 'var(--text)',
+                  fontSize: '0.82rem', fontFamily: 'var(--font-body)',
+                  transition: 'border-color var(--t)',
+                  outline: 'none',
+                  boxSizing: 'border-box',
+                }}
+                onFocus={e => (e.target.style.borderColor = 'var(--primary)')}
+                onBlur={e => (e.target.style.borderColor = 'var(--border)')}
+              />
             </div>
           )}
-          {hasAdvancedFilters && (
-            <button className={`btn-filter${panelOpen ? ' active' : ''}`}
-              onClick={() => setPanelOpen(p => !p)}>
-              <span>⚡ Filtros</span>
-              {activeFilterCount > 0 && <span className="filter-badge">{activeFilterCount}</span>}
-            </button>
-          )}
-          <span className="toolbar-count" style={{ marginLeft: 'auto' }}>
-            {filtered.length} registro{filtered.length !== 1 ? 's' : ''}
-            {data.length !== filtered.length && (
-              <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}> de {data.length}</span>
+
+          {/* Select filters */}
+          {filterSelects?.map(fs => (
+            <div key={fs.key} style={{ flex: '1 1 150px', minWidth: 140 }}>
+              <label style={{ display: 'block', fontSize: '0.62rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', marginBottom: '0.2rem' }}>
+                {fs.label}
+              </label>
+              <select
+                value={filterValues[fs.key] ?? ''}
+                onChange={e => { setFilterValues(p => ({ ...p, [fs.key]: e.target.value })); resetPage() }}
+                style={{
+                  width: '100%', height: '36px',
+                  background: filterValues[fs.key] ? 'var(--primary-subtle)' : 'var(--bg-input)',
+                  border: filterValues[fs.key] ? '1px solid var(--primary)' : '1px solid var(--border)',
+                  borderRadius: 'var(--r-md)', color: 'var(--text)',
+                  fontSize: '0.8rem', fontFamily: 'var(--font-body)',
+                  padding: '0 0.5rem',
+                  outline: 'none',
+                }}
+              >
+                <option value="">Todos</option>
+                {fs.options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </div>
+          ))}
+
+          {/* Date filters */}
+          {dateFilters?.map(df => (
+            <div key={df.key} style={{ flex: '1 1 240px', minWidth: 220 }}>
+              <label style={{ display: 'block', fontSize: '0.62rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', marginBottom: '0.2rem' }}>
+                📅 {df.label}
+              </label>
+              <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
+                <input
+                  type="date"
+                  value={dateFrom[df.key] ?? ''}
+                  onChange={e => { setDateFrom(p => ({ ...p, [df.key]: e.target.value })); resetPage() }}
+                  style={{ flex: 1, height: '36px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text)', fontSize: '0.78rem', fontFamily: 'var(--font-body)', padding: '0 0.4rem', outline: 'none' }}
+                />
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>–</span>
+                <input
+                  type="date"
+                  value={dateTo[df.key] ?? ''}
+                  onChange={e => { setDateTo(p => ({ ...p, [df.key]: e.target.value })); resetPage() }}
+                  style={{ flex: 1, height: '36px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text)', fontSize: '0.78rem', fontFamily: 'var(--font-body)', padding: '0 0.4rem', outline: 'none' }}
+                />
+              </div>
+            </div>
+          ))}
+
+          {/* Clear + count */}
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: '0.5rem', marginLeft: 'auto' }}>
+            {(hasFilters || search) && (
+              <button
+                onClick={() => { clearAll(); setSearch(''); resetPage() }}
+                style={{ height: '36px', padding: '0 0.75rem', background: 'transparent', border: '1px solid var(--border-soft)', borderRadius: 'var(--r-md)', color: 'var(--text-muted)', fontSize: '0.78rem', cursor: 'pointer', whiteSpace: 'nowrap' }}
+              >
+                ✕ Limpiar
+              </button>
             )}
-          </span>
+            <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', lineHeight: '36px' }}>
+              {filtered.length} registro{filtered.length !== 1 ? 's' : ''}
+              {data.length !== filtered.length && <span style={{ color: 'var(--text-dim)' }}> / {data.length}</span>}
+            </span>
+          </div>
         </div>
-
-        {panelOpen && hasAdvancedFilters && (
-          <div className="filter-panel">
-            {filterSelects?.map(fs => (
-              <div className="filter-group" key={fs.key}>
-                <span className="filter-label">{fs.label}</span>
-                <select value={filterValues[fs.key] ?? ''}
-                  onChange={e => { setFilterValues(p => ({ ...p, [fs.key]: e.target.value })); resetPage() }}>
-                  <option value="">Todos</option>
-                  {fs.options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                </select>
-              </div>
-            ))}
-            {dateFilters?.map(df => (
-              <div className="filter-group" key={df.key} style={{ gridColumn: 'span 2' }}>
-                <span className="filter-label">📅 {df.label}</span>
-                <div className="filter-date-range">
-                  <input type="date" value={dateFrom[df.key] ?? ''}
-                    onChange={e => { setDateFrom(p => ({ ...p, [df.key]: e.target.value })); resetPage() }} />
-                  <input type="date" value={dateTo[df.key] ?? ''}
-                    onChange={e => { setDateTo(p => ({ ...p, [df.key]: e.target.value })); resetPage() }} />
-                </div>
-              </div>
-            ))}
-            {hasFilters && (
-              <div className="filter-group" style={{ justifyContent: 'flex-end' }}>
-                <span className="filter-label">&nbsp;</span>
-                <button className="btn btn-ghost btn-sm" onClick={clearAll} style={{ marginTop: '0.2rem' }}>
-                  ✕ Limpiar todo
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-
-        {activeChips.length > 0 && (
-          <div className="filter-chips">
-            {activeChips.map(chip => (
-              <span key={chip.key} className="filter-chip">
-                <span style={{ color: 'var(--text-dim)', fontWeight: 500 }}>{chip.label}:</span> {chip.value}
-                <button className="filter-chip-remove" onClick={() => clearFilter(chip.key, chip.type)}>✕</button>
-              </span>
-            ))}
-            <button className="filter-chips-clear" onClick={clearAll}>Limpiar filtros</button>
-          </div>
-        )}
-      </div>
+      )}
 
       {loading ? (
         <div className="loading-center"><div className="spinner" /><span>Cargando…</span></div>
@@ -355,7 +373,7 @@ export default function CrudPage({
           <p>No hay registros{search || hasFilters ? ' que coincidan' : ''}.</p>
           {!search && !hasFilters && <small>Haz clic en &quot;+ Nuevo&quot; para agregar el primero.</small>}
           {(search || hasFilters) && (
-            <button className="btn btn-ghost btn-sm" onClick={clearAll} style={{ marginTop: '0.5rem' }}>
+            <button className="btn btn-ghost btn-sm" onClick={() => { clearAll(); setSearch(''); resetPage() }} style={{ marginTop: '0.5rem' }}>
               ✕ Limpiar filtros
             </button>
           )}
