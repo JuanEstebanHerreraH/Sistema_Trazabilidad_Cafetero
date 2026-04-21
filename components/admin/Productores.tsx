@@ -1,7 +1,19 @@
 'use client'
+import { useMemo } from 'react'
+import { useRead } from '../../hooks/useCrud'
 import CrudPage from '../../components/CrudPage'
 
 export default function Productores() {
+  const { data: productores } = useRead('productor', 'idproductor, nombre, contacto, region', 'nombre')
+
+  // Build unique region options from loaded data
+  const regionOptions = useMemo(() => {
+    const regiones = Array.from(
+      new Set(productores.map(p => p.region).filter(Boolean))
+    ).sort() as string[]
+    return regiones.map(r => ({ value: r, label: r }))
+  }, [productores])
+
   return (
     <CrudPage
       title="Productores" subtitle="Productores de café registrados" icon="👨‍🌾"
@@ -19,6 +31,9 @@ export default function Productores() {
         { key: 'contacto', label: 'Teléfono / Email', type: 'text', required: false, placeholder: 'Ej: 310 000 0000' },
         { key: 'region',   label: 'Región',           type: 'text', required: false, placeholder: 'Ej: Huila, Nariño…' },
       ]}
+      filterSelects={regionOptions.length > 0 ? [
+        { key: 'region', label: 'Región', options: regionOptions },
+      ] : undefined}
     />
   )
 }

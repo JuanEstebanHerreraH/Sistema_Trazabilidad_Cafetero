@@ -30,9 +30,9 @@ export default function Fincas() {
           options: productores.map(p => ({ value: p.idproductor, label: p.nombre })),
         },
       ]}
-      filterSelects={productores.length > 0 ? [
-        { key: 'idproductor', label: 'Productor', options: productores.map(p => ({ value: String(p.idproductor), label: p.nombre })) },
-      ] : undefined}
+      filterSelects={[
+        ...(productores.length > 0 ? [{ key: 'idproductor', label: 'Productor', options: productores.map(p => ({ value: String(p.idproductor), label: p.nombre })) }] : []),
+      ]}
     />
   )
 }

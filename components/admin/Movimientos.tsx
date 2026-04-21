@@ -259,7 +259,7 @@ export default function Movimientos() {
         border: '1px solid var(--border-soft)', borderRadius: 'var(--r-xl)', padding: '0.75rem 1rem',
       }}>
         {/* Search */}
-        <div style={{ flex: '2 1 200px', minWidth: 180, position: 'relative' }}>
+        <div style={{ flex: '0 1 260px', minWidth: 180, position: 'relative' }}>
           <span style={{ position: 'absolute', left: '0.65rem', top: '50%', transform: 'translateY(-50%)', fontSize: '0.82rem', color: 'var(--text-muted)', pointerEvents: 'none' }}>🔍</span>
           <input type="text" placeholder="Buscar por lote, almacén, notas…" value={search}
             onChange={e => { setSearch(e.target.value); resetPage() }}

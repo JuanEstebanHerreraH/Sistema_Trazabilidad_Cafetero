@@ -91,9 +91,9 @@ export default function Ventas() {
           },
         ]}
         fields={fields}
-        filterSelects={clientes.length > 0 ? [
-          { key: 'idcliente', label: 'Cliente', options: clientes.map(c => ({ value: String(c.idcliente), label: c.nombre })) },
-        ] : []}
+        filterSelects={[
+          ...(clientes.length > 0 ? [{ key: 'idcliente', label: 'Cliente', options: clientes.map(c => ({ value: String(c.idcliente), label: c.nombre })) }] : []),
+        ]}
         dateFilters={[
           { key: 'fecha_venta', label: 'Fecha de venta' },
         ]}

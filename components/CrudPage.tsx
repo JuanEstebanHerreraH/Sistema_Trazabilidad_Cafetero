@@ -276,7 +276,7 @@ export default function CrudPage({
         }}>
           {/* Search */}
           {hasAnySearch && (
-            <div style={{ flex: '2 1 200px', minWidth: 180, position: 'relative' }}>
+            <div style={{ flex: '0 1 260px', minWidth: 180, position: 'relative' }}>
               <span style={{ position: 'absolute', left: '0.65rem', top: '50%', transform: 'translateY(-50%)', fontSize: '0.82rem', color: 'var(--text-muted)', pointerEvents: 'none' }}>🔍</span>
               <input
                 type="text"
@@ -374,7 +374,7 @@ export default function CrudPage({
           {!search && !hasFilters && <small>Haz clic en &quot;+ Nuevo&quot; para agregar el primero.</small>}
           {(search || hasFilters) && (
             <button className="btn btn-ghost btn-sm" onClick={() => { clearAll(); setSearch(''); resetPage() }} style={{ marginTop: '0.5rem' }}>
-              ✕ Limpiar filtros
+              {search && !hasFilters ? '✕ Limpiar búsqueda' : '✕ Limpiar filtros'}
             </button>
           )}
         </div>
