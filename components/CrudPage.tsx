@@ -70,6 +70,9 @@ export default function CrudPage({
   const [sortKey, setSortKey] = useState<string | null>(null)
   const [sortDir, setSortDir] = useState<SortDir>(null)
 
+  const [page, setPage] = useState(1)
+  const PAGE_SIZE = 15
+
   const [modalOpen, setModalOpen] = useState(false)
   const [viewModal, setViewModal] = useState(false)
   const [viewRecord, setViewRecord] = useState<any>(null)
@@ -108,6 +111,7 @@ export default function CrudPage({
     setDateFrom({})
     setDateTo({})
     setSearch('')
+    setPage(1)
   }, [])
 
   const filtered = useMemo(() => {
@@ -134,6 +138,11 @@ export default function CrudPage({
     }
     return result
   }, [data, search, searchKey, filterValues, filterSelects, dateFilters, dateFrom, dateTo, sortKey, sortDir])
+
+  const pageCount = Math.ceil(filtered.length / PAGE_SIZE)
+  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+
+  const resetPage = () => setPage(1)
 
   const toggleSort = (key: string) => {
     if (sortKey === key) {
@@ -261,7 +270,7 @@ export default function CrudPage({
             <div className="toolbar-search">
               <span className="search-icon">🔍</span>
               <input type="text" placeholder="Buscar…" value={search}
-                onChange={e => setSearch(e.target.value)} />
+                onChange={e => { setSearch(e.target.value); resetPage() }} />
             </div>
           )}
           {hasAdvancedFilters && (
@@ -285,7 +294,7 @@ export default function CrudPage({
               <div className="filter-group" key={fs.key}>
                 <span className="filter-label">{fs.label}</span>
                 <select value={filterValues[fs.key] ?? ''}
-                  onChange={e => setFilterValues(p => ({ ...p, [fs.key]: e.target.value }))}>
+                  onChange={e => { setFilterValues(p => ({ ...p, [fs.key]: e.target.value })); resetPage() }}>
                   <option value="">Todos</option>
                   {fs.options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                 </select>
@@ -296,9 +305,9 @@ export default function CrudPage({
                 <span className="filter-label">📅 {df.label}</span>
                 <div className="filter-date-range">
                   <input type="date" value={dateFrom[df.key] ?? ''}
-                    onChange={e => setDateFrom(p => ({ ...p, [df.key]: e.target.value }))} />
+                    onChange={e => { setDateFrom(p => ({ ...p, [df.key]: e.target.value })); resetPage() }} />
                   <input type="date" value={dateTo[df.key] ?? ''}
-                    onChange={e => setDateTo(p => ({ ...p, [df.key]: e.target.value }))} />
+                    onChange={e => { setDateTo(p => ({ ...p, [df.key]: e.target.value })); resetPage() }} />
                 </div>
               </div>
             ))}
@@ -360,7 +369,7 @@ export default function CrudPage({
               </tr>
             </thead>
             <tbody>
-              {filtered.map(row => (
+              {paged.map(row => (
                 <tr key={row[idField]}>
                   {columns.map(col => (
                     <td key={col.key}>
@@ -380,6 +389,22 @@ export default function CrudPage({
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Pagination */}
+      {!loading && pageCount > 1 && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+          <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+            {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} de {filtered.length}
+          </span>
+          <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
+            <button className="btn btn-ghost btn-sm" disabled={page === 1} onClick={() => setPage(p => p - 1)}>‹ Ant</button>
+            {Array.from({ length: Math.min(pageCount, 5) }, (_, i) => Math.max(1, Math.min(pageCount - 4, page - 2)) + i).map(p => (
+              <button key={p} className={`btn btn-sm ${p === page ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setPage(p)}>{p}</button>
+            ))}
+            <button className="btn btn-ghost btn-sm" disabled={page === pageCount} onClick={() => setPage(p => p + 1)}>Sig ›</button>
+          </div>
         </div>
       )}
 

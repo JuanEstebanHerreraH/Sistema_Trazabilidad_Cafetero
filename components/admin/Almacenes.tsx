@@ -25,6 +25,8 @@ export default function Almacenes() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const PAGE_SIZE_A = 12
 
   // Modal crear/editar
   const [modalOpen, setModalOpen] = useState(false)
@@ -143,6 +145,9 @@ export default function Almacenes() {
     return matchSearch && matchEstado
   })
 
+  const pageCount = Math.ceil(filtered.length / PAGE_SIZE_A)
+  const paged = filtered.slice((page - 1) * PAGE_SIZE_A, page * PAGE_SIZE_A)
+
   const getStatusBadge = (alm: AlmacenStock) => {
     if (alm.capacidad_kg == null || alm.capacidad_kg <= 0) return null
     const pct = alm.porcentaje_ocupacion ?? 0
@@ -201,7 +206,7 @@ export default function Almacenes() {
         <div className="filter-row">
           <div className="toolbar-search">
             <span className="search-icon">🔍</span>
-            <input type="text" placeholder="Buscar almacén o ubicación…" value={search} onChange={e => setSearch(e.target.value)} />
+            <input type="text" placeholder="Buscar almacén o ubicación…" value={search} onChange={e => { setSearch(e.target.value); setPage(1) }} />
           </div>
           <div className="filter-segments">
             {([
@@ -212,7 +217,7 @@ export default function Almacenes() {
               { v: 'sin_limite', lbl: '∞ Sin límite' },
             ] as const).map(o => (
               <button key={o.v} className={`filter-seg${filtroEstado === o.v ? ' active' : ''}`}
-                onClick={() => setFiltroEstado(o.v)}>{o.lbl}</button>
+                onClick={() => { setFiltroEstado(o.v); setPage(1) }}>{o.lbl}</button>
             ))}
           </div>
           <span className="toolbar-count" style={{ marginLeft: 'auto' }}>
@@ -232,7 +237,7 @@ export default function Almacenes() {
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1rem' }}>
-          {filtered.map(alm => {
+          {paged.map(alm => {
             const badge = getStatusBadge(alm)
             const pct = alm.porcentaje_ocupacion ?? 0
             return (
@@ -294,6 +299,22 @@ export default function Almacenes() {
               </div>
             )
           })}
+        </div>
+      )}
+
+      {/* Paginación */}
+      {!loading && pageCount > 1 && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+          <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+            {(page - 1) * PAGE_SIZE_A + 1}–{Math.min(page * PAGE_SIZE_A, filtered.length)} de {filtered.length} almacenes
+          </span>
+          <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
+            <button className="btn btn-ghost btn-sm" disabled={page === 1} onClick={() => setPage(p => p - 1)}>‹ Ant</button>
+            {Array.from({ length: Math.min(pageCount, 5) }, (_, i) => Math.max(1, Math.min(pageCount - 4, page - 2)) + i).map(p => (
+              <button key={p} className={`btn btn-sm ${p === page ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setPage(p)}>{p}</button>
+            ))}
+            <button className="btn btn-ghost btn-sm" disabled={page === pageCount} onClick={() => setPage(p => p + 1)}>Sig ›</button>
+          </div>
         </div>
       )}
 

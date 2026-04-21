@@ -1,6 +1,7 @@
 'use client'
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { createClient } from '../../utils/supabase/client'
+import FilterBar from '../FilterBar'
 
 // ── Singleton: evita re-crear el client en cada render (causa loop infinito) ──
 const supabase = createClient()
@@ -413,8 +414,42 @@ function CarritoView({ carrito, totalKg, totalCOP, onQuitar, onConfirmar, compra
 }
 
 // ── Historial de compras ──────────────────────────────────────────────────────
+const PAGE_SIZE_H = 8
+
 function HistorialCompras({ ventas, onVerCatalogo }: { ventas: VentaHistorial[]; onVerCatalogo: () => void }) {
   const [expandido, setExpandido] = useState<number | null>(null)
+  const [search, setSearch] = useState('')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+  const [page, setPage] = useState(1)
+
+  const ventasFiltradas = useMemo(() => {
+    let r = ventas
+    if (search) {
+      const q = search.toLowerCase()
+      r = r.filter(v =>
+        v.detalle_venta?.some(d =>
+          d.lote_cafe?.variedad?.toLowerCase().includes(q) ||
+          d.lote_cafe?.finca?.nombre?.toLowerCase().includes(q)
+        )
+      )
+    }
+    if (dateFrom) r = r.filter(v => v.fecha_venta >= dateFrom)
+    if (dateTo) r = r.filter(v => v.fecha_venta <= dateTo + 'T23:59:59')
+    r = [...r].sort((a, b) => {
+      const d = new Date(a.fecha_venta).getTime() - new Date(b.fecha_venta).getTime()
+      return sortDir === 'asc' ? d : -d
+    })
+    return r
+  }, [ventas, search, dateFrom, dateTo, sortDir])
+
+  const pageCount = Math.ceil(ventasFiltradas.length / PAGE_SIZE_H)
+  const paged = ventasFiltradas.slice((page - 1) * PAGE_SIZE_H, page * PAGE_SIZE_H)
+  const activeCount = [dateFrom, dateTo].filter(Boolean).length
+
+  const totalKg  = ventas.reduce((s, v) => s + (v.total_kg ?? 0), 0)
+  const totalCOP = ventas.reduce((s, v) => s + ((v.total_kg ?? 0) * (v.precio_kg ?? 0)), 0)
 
   if (ventas.length === 0) return (
     <div className="empty-state">
@@ -424,12 +459,9 @@ function HistorialCompras({ ventas, onVerCatalogo }: { ventas: VentaHistorial[];
     </div>
   )
 
-  const totalKg  = ventas.reduce((s, v) => s + (v.total_kg ?? 0), 0)
-  const totalCOP = ventas.reduce((s, v) => s + ((v.total_kg ?? 0) * (v.precio_kg ?? 0)), 0)
-
   return (
     <div>
-      {/* Resumen compacto */}
+      {/* Resumen */}
       <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
         {[
           { label: 'Compras', val: ventas.length, color: 'var(--primary)' },
@@ -443,51 +475,75 @@ function HistorialCompras({ ventas, onVerCatalogo }: { ventas: VentaHistorial[];
         ))}
       </div>
 
-      {/* Tabla compacta con acordeón */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-        {ventas.map(v => {
-          const abierto = expandido === v.idventa
-          const totalV  = (v.total_kg ?? 0) * (v.precio_kg ?? 0)
-          return (
-            <div key={v.idventa} style={{ background: 'var(--bg-card)', border: '1px solid var(--border-soft)', borderRadius: 'var(--r-lg)', overflow: 'hidden', transition: 'border-color 0.2s' }}>
-              {/* Fila principal — siempre visible */}
-              <button
-                onClick={() => setExpandido(abierto ? null : v.idventa)}
-                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.65rem 1rem', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left' }}
-              >
-                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', minWidth: 28 }}>#{v.idventa}</span>
-                <span className="badge badge-green" style={{ fontSize: '0.64rem', padding: '0.15rem 0.5rem' }}>✓</span>
-                <span style={{ flex: 1, fontSize: '0.82rem', color: 'var(--text-soft)' }}>
-                  {new Date(v.fecha_venta).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })}
-                </span>
-                {v.total_kg && (
-                  <span style={{ fontWeight: 700, color: 'var(--primary)', fontSize: '0.88rem' }}>{v.total_kg} kg</span>
-                )}
-                {totalV > 0 && (
-                  <span style={{ color: 'var(--text-soft)', fontSize: '0.8rem', minWidth: 90, textAlign: 'right' }}>${totalV.toLocaleString('es-CO')}</span>
-                )}
-                <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginLeft: '0.25rem' }}>{abierto ? '▲' : '▼'}</span>
-              </button>
+      {/* Filtros */}
+      <FilterBar
+        search={search} onSearchChange={v => { setSearch(v); setPage(1) }} searchPlaceholder="Buscar variedad o finca…"
+        dateFrom={dateFrom} dateTo={dateTo}
+        onDateFromChange={v => { setDateFrom(v); setPage(1) }} onDateToChange={v => { setDateTo(v); setPage(1) }}
+        sortDir={sortDir} onSortDirChange={setSortDir} sortLabel="Fecha"
+        activeCount={activeCount} onClear={() => { setDateFrom(''); setDateTo('') }}
+      />
 
-              {/* Detalle expandible */}
-              {abierto && (
-                <div style={{ borderTop: '1px solid var(--border-soft)', padding: '0.6rem 1rem 0.75rem' }}>
-                  {(v.detalle_venta ?? []).map(d => (
-                    <div key={d.iddetalle_venta} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.3rem 0', fontSize: '0.8rem', borderBottom: '1px solid var(--border-soft)' }}>
-                      <span style={{ color: 'var(--text-soft)' }}>
-                        ☕ <strong style={{ color: 'var(--text)' }}>{d.lote_cafe?.variedad ?? '—'}</strong>
-                        {d.lote_cafe?.finca ? <span style={{ color: 'var(--text-dim)' }}> · {d.lote_cafe.finca.nombre}</span> : null}
+      {ventasFiltradas.length === 0 ? (
+        <div className="empty-state"><div className="empty-icon">🔍</div><p>Sin resultados con esos filtros.</p></div>
+      ) : (
+        <>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+            {paged.map(v => {
+              const abierto = expandido === v.idventa
+              const totalV = (v.total_kg ?? 0) * (v.precio_kg ?? 0)
+              return (
+                <div key={v.idventa} style={{ background: 'var(--bg-card)', border: '1px solid var(--border-soft)', borderRadius: 'var(--r-lg)', overflow: 'hidden' }}>
+                  <button onClick={() => setExpandido(abierto ? null : v.idventa)}
+                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.65rem 1rem', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', minWidth: 28 }}>#{v.idventa}</span>
+                    <span className="badge badge-green" style={{ fontSize: '0.64rem', padding: '0.15rem 0.5rem' }}>✓</span>
+                    <span style={{ flex: 1, fontSize: '0.82rem', color: 'var(--text-soft)' }}>
+                      {new Date(v.fecha_venta).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })}
+                    </span>
+                    {v.detalle_venta?.[0]?.lote_cafe?.variedad && (
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)', display: 'none' } as any} className="hide-mobile">
+                        {v.detalle_venta.map(d => d.lote_cafe?.variedad).filter(Boolean).join(', ')}
                       </span>
-                      <span style={{ fontWeight: 600, color: 'var(--text-soft)' }}>{d.cantidad} kg — ${(d.cantidad * d.precio_venta).toLocaleString('es-CO')}</span>
+                    )}
+                    {v.total_kg && <span style={{ fontWeight: 700, color: 'var(--primary)', fontSize: '0.88rem' }}>{v.total_kg} kg</span>}
+                    {totalV > 0 && <span style={{ color: 'var(--text-soft)', fontSize: '0.8rem', minWidth: 90, textAlign: 'right' }}>${totalV.toLocaleString('es-CO')}</span>}
+                    <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginLeft: '0.25rem' }}>{abierto ? '▲' : '▼'}</span>
+                  </button>
+                  {abierto && (
+                    <div style={{ borderTop: '1px solid var(--border-soft)', padding: '0.6rem 1rem 0.75rem' }}>
+                      {(v.detalle_venta ?? []).map(d => (
+                        <div key={d.iddetalle_venta} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.3rem 0', fontSize: '0.8rem', borderBottom: '1px solid var(--border-soft)' }}>
+                          <span style={{ color: 'var(--text-soft)' }}>
+                            ☕ <strong style={{ color: 'var(--text)' }}>{d.lote_cafe?.variedad ?? '—'}</strong>
+                            {d.lote_cafe?.finca ? <span style={{ color: 'var(--text-dim)' }}> · {d.lote_cafe.finca.nombre}</span> : null}
+                          </span>
+                          <span style={{ fontWeight: 600, color: 'var(--text-soft)' }}>{d.cantidad} kg — ${(d.cantidad * d.precio_venta).toLocaleString('es-CO')}</span>
+                        </div>
+                      ))}
+                      {v.notas && <div style={{ marginTop: '0.4rem', fontSize: '0.73rem', color: 'var(--text-muted)' }}>📝 {v.notas}</div>}
                     </div>
-                  ))}
-                  {v.notas && <div style={{ marginTop: '0.4rem', fontSize: '0.73rem', color: 'var(--text-muted)' }}>📝 {v.notas}</div>}
+                  )}
                 </div>
-              )}
+              )
+            })}
+          </div>
+          {pageCount > 1 && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                {(page - 1) * PAGE_SIZE_H + 1}–{Math.min(page * PAGE_SIZE_H, ventasFiltradas.length)} de {ventasFiltradas.length}
+              </span>
+              <div style={{ display: 'flex', gap: '0.35rem' }}>
+                <button className="btn btn-ghost btn-sm" disabled={page === 1} onClick={() => setPage(p => p - 1)}>‹ Ant</button>
+                {Array.from({ length: Math.min(pageCount, 5) }, (_, i) => Math.max(1, Math.min(pageCount - 4, page - 2)) + i).map(p => (
+                  <button key={p} className={`btn btn-sm ${p === page ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setPage(p)}>{p}</button>
+                ))}
+                <button className="btn btn-ghost btn-sm" disabled={page === pageCount} onClick={() => setPage(p => p + 1)}>Sig ›</button>
+              </div>
             </div>
-          )
-        })}
-      </div>
+          )}
+        </>
+      )}
     </div>
   )
 }

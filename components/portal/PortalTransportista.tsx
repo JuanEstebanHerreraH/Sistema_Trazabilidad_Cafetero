@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { createClient } from '../../utils/supabase/client'
 
 interface UsuarioPortal { idusuario: number; nombre: string; email: string }
@@ -23,6 +23,9 @@ export default function PortalTransportista({ usuario }: { usuario: UsuarioPorta
   const [lotes, setLotes] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [filtroTipo, setFiltroTipo] = useState('')
+  const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const PAGE_SIZE = 15
 
   // Modal nuevo movimiento
   const [modalOpen, setModalOpen] = useState(false)
@@ -121,7 +124,22 @@ export default function PortalTransportista({ usuario }: { usuario: UsuarioPorta
     setSaving(false); setModalOpen(false); await cargar()
   }
 
-  const filtered = movimientos.filter(m => !filtroTipo || m.tipo === filtroTipo)
+  const filtered = useMemo(() => {
+    let r = movimientos
+    if (filtroTipo) r = r.filter(m => m.tipo === filtroTipo)
+    if (search) {
+      const q = search.toLowerCase()
+      r = r.filter(m =>
+        m.lote_cafe?.variedad?.toLowerCase().includes(q) ||
+        m.almacen_origen?.nombre?.toLowerCase().includes(q) ||
+        m.almacen_destino?.nombre?.toLowerCase().includes(q) ||
+        (m.notas ?? '').toLowerCase().includes(q)
+      )
+    }
+    return r
+  }, [movimientos, filtroTipo, search])
+  const pageCount = Math.ceil(filtered.length / PAGE_SIZE)
+  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
   const stats = [
     { label: 'Entradas',  val: movimientos.filter(m => m.tipo === 'entrada').length,  color: 'var(--green)' },
     { label: 'Salidas',   val: movimientos.filter(m => m.tipo === 'salida').length,   color: 'var(--red)'   },
@@ -180,8 +198,14 @@ export default function PortalTransportista({ usuario }: { usuario: UsuarioPorta
       )}
 
       {/* Filtro y tabla */}
-      <div className="toolbar" style={{ marginBottom: '1rem' }}>
-        <select className="form-select" style={{ flex: '0 0 auto', minWidth: 160 }} value={filtroTipo} onChange={e => setFiltroTipo(e.target.value)}>
+      <div className="toolbar" style={{ marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+        <div style={{ position: 'relative', flex: 1, minWidth: 160 }}>
+          <span style={{ position: 'absolute', left: '0.7rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', fontSize: '0.85rem', pointerEvents: 'none' }}>🔍</span>
+          <input className="form-input" style={{ paddingLeft: '2rem', height: 36 }} placeholder="Buscar lote, almacén…"
+            value={search} onChange={e => { setSearch(e.target.value); setPage(1) }} />
+        </div>
+        <select className="form-select" style={{ flex: '0 0 auto', minWidth: 150, height: 36 }}
+          value={filtroTipo} onChange={e => { setFiltroTipo(e.target.value); setPage(1) }}>
           <option value="">Todos los tipos</option>
           <option value="entrada">📥 Entrada</option>
           <option value="salida">📤 Salida</option>
@@ -193,15 +217,16 @@ export default function PortalTransportista({ usuario }: { usuario: UsuarioPorta
       {loading ? (
         <div className="loading-center"><div className="spinner" /><span>Cargando…</span></div>
       ) : filtered.length === 0 ? (
-        <div className="empty-state"><div className="empty-icon">🚛</div><p>No hay movimientos{filtroTipo ? ' de este tipo' : ''} registrados.</p></div>
+        <div className="empty-state"><div className="empty-icon">🚛</div><p>No hay movimientos{filtroTipo || search ? ' con esos filtros' : ''} registrados.</p></div>
       ) : (
+        <>
         <div className="data-table-wrap table-responsive">
           <table className="data-table">
             <thead>
               <tr><th>Tipo</th><th>Lote</th><th>Cantidad</th><th>Origen</th><th>Destino</th><th>Fecha</th><th>Notas</th></tr>
             </thead>
             <tbody>
-              {filtered.map((m: any) => (
+              {paged.map((m: any) => (
                 <tr key={m.idmovimiento_inventario}>
                   <td><span className={`badge ${tipoBadge[m.tipo] ?? 'badge-muted'}`}>{tipoIcon[m.tipo]} {m.tipo}</span></td>
                   <td><strong style={{ color: 'var(--text)' }}>{m.lote_cafe?.variedad ?? '—'}</strong></td>
@@ -215,6 +240,21 @@ export default function PortalTransportista({ usuario }: { usuario: UsuarioPorta
             </tbody>
           </table>
         </div>
+        {pageCount > 1 && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+            <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+              {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} de {filtered.length}
+            </span>
+            <div style={{ display: 'flex', gap: '0.35rem' }}>
+              <button className="btn btn-ghost btn-sm" disabled={page === 1} onClick={() => setPage(p => p - 1)}>‹ Ant</button>
+              {Array.from({ length: Math.min(pageCount, 5) }, (_, i) => Math.max(1, Math.min(pageCount - 4, page - 2)) + i).map(p => (
+                <button key={p} className={`btn btn-sm ${p === page ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setPage(p)}>{p}</button>
+              ))}
+              <button className="btn btn-ghost btn-sm" disabled={page === pageCount} onClick={() => setPage(p => p + 1)}>Sig ›</button>
+            </div>
+          </div>
+        )}
+        </>
       )}
 
       {/* Modal Nuevo Movimiento */}

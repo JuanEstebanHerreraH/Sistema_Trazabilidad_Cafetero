@@ -48,6 +48,8 @@ export default function Movimientos() {
   const [panelOpen, setPanelOpen]     = useState(false)
   const [sortKey, setSortKey]         = useState<string | null>('fecha_movimiento')
   const [sortDir, setSortDir]         = useState<'asc' | 'desc'>('desc')
+  const [page, setPage]               = useState(1)
+  const PAGE_SIZE = 20
 
   // Contenido del almacén origen (solo para salida/traslado)
   const [contenidoOrigen, setContenidoOrigen] = useState<ContenidoOrigen[]>([])
@@ -114,7 +116,7 @@ export default function Movimientos() {
 
   const clearAllFilters = () => {
     setSearch(''); setFiltroTipo(''); setFiltroAlmacen('')
-    setFiltroDesde(''); setFiltroHasta('')
+    setFiltroDesde(''); setFiltroHasta(''); setPage(1)
   }
 
   const filtered = useMemo(() => {
@@ -146,6 +148,10 @@ export default function Movimientos() {
     }
     return r
   }, [data, search, filtroTipo, filtroAlmacen, filtroDesde, filtroHasta, sortKey, sortDir])
+
+  const pageCount = Math.ceil(filtered.length / PAGE_SIZE)
+  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+  const resetPage = () => setPage(1)
 
   const toggleSort = (key: string) => {
     if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
@@ -273,14 +279,14 @@ export default function Movimientos() {
           <div className="toolbar-search">
             <span className="search-icon">🔍</span>
             <input type="text" placeholder="Buscar por lote, almacén, notas…" value={search}
-              onChange={e => setSearch(e.target.value)} />
+              onChange={e => { setSearch(e.target.value); resetPage() }} />
           </div>
 
           {/* Tipo segmented */}
           <div className="filter-segments">
             {(['', 'entrada', 'salida', 'traslado'] as const).map(t => (
               <button key={t || 'all'} className={`filter-seg${filtroTipo === t ? ' active' : ''}`}
-                onClick={() => setFiltroTipo(t)}>
+                onClick={() => { setFiltroTipo(t); resetPage() }}>
                 {t === '' ? 'Todos' : `${tipoIcon[t]} ${t.charAt(0).toUpperCase() + t.slice(1)}`}
               </button>
             ))}
@@ -305,7 +311,7 @@ export default function Movimientos() {
           <div className="filter-panel">
             <div className="filter-group">
               <span className="filter-label">🏭 Almacén (origen o destino)</span>
-              <select value={filtroAlmacen} onChange={e => setFiltroAlmacen(e.target.value)}>
+              <select value={filtroAlmacen} onChange={e => { setFiltroAlmacen(e.target.value); resetPage() }}>
                 <option value="">Todos los almacenes</option>
                 {almacenes.map(a => <option key={a.idalmacen} value={a.idalmacen}>{a.nombre}</option>)}
               </select>
@@ -313,8 +319,8 @@ export default function Movimientos() {
             <div className="filter-group" style={{ gridColumn: 'span 2' }}>
               <span className="filter-label">📅 Rango de fechas</span>
               <div className="filter-date-range">
-                <input type="date" value={filtroDesde} onChange={e => setFiltroDesde(e.target.value)} />
-                <input type="date" value={filtroHasta} onChange={e => setFiltroHasta(e.target.value)} />
+                <input type="date" value={filtroDesde} onChange={e => { setFiltroDesde(e.target.value); resetPage() }} />
+                <input type="date" value={filtroHasta} onChange={e => { setFiltroHasta(e.target.value); resetPage() }} />
               </div>
             </div>
             {(filtroAlmacen || filtroDesde || filtroHasta) && (
@@ -366,7 +372,7 @@ export default function Movimientos() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map(row => (
+              {paged.map(row => (
                 <tr key={row.idmovimiento_inventario}>
                   <td style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>{row.idmovimiento_inventario}</td>
                   <td><span className={`badge ${tipoBadge[row.tipo] ?? 'badge-amber'}`}>{tipoIcon[row.tipo]} {row.tipo}</span></td>
@@ -398,6 +404,22 @@ export default function Movimientos() {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Paginación */}
+      {!loading && pageCount > 1 && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+          <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+            {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} de {filtered.length} movimientos
+          </span>
+          <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
+            <button className="btn btn-ghost btn-sm" disabled={page === 1} onClick={() => setPage(p => p - 1)}>‹ Ant</button>
+            {Array.from({ length: Math.min(pageCount, 5) }, (_, i) => Math.max(1, Math.min(pageCount - 4, page - 2)) + i).map(p => (
+              <button key={p} className={`btn btn-sm ${p === page ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setPage(p)}>{p}</button>
+            ))}
+            <button className="btn btn-ghost btn-sm" disabled={page === pageCount} onClick={() => setPage(p => p + 1)}>Sig ›</button>
+          </div>
         </div>
       )}
 

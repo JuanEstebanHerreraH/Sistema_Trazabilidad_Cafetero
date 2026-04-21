@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { createClient } from '../../utils/supabase/client'
 
 interface UsuarioPortal { idusuario: number; nombre: string; email: string }
@@ -14,6 +14,9 @@ export default function PortalCatador({ usuario }: { usuario: UsuarioPortal }) {
   const [registros, setRegistros] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [filtro, setFiltro] = useState('')
+  const [filtroEval, setFiltroEval] = useState('')
+  const [page, setPage] = useState(1)
+  const PAGE_SIZE = 15
 
   // Modal catar
   const [modalOpen, setModalOpen] = useState(false)
@@ -78,15 +81,23 @@ export default function PortalCatador({ usuario }: { usuario: UsuarioPortal }) {
     return { texto: notas, puntaje: null }
   }
 
-  const filtrados = registros.filter(r => {
-    if (!filtro) return true
-    const q = filtro.toLowerCase()
-    return (
-      r.lote_cafe?.variedad?.toLowerCase().includes(q) ||
-      r.lote_cafe?.finca?.nombre?.toLowerCase().includes(q) ||
-      r.proceso?.nombre?.toLowerCase().includes(q)
-    )
-  })
+  const filtrados = useMemo(() => {
+    let r = registros
+    if (filtro) {
+      const q = filtro.toLowerCase()
+      r = r.filter(x =>
+        x.lote_cafe?.variedad?.toLowerCase().includes(q) ||
+        x.lote_cafe?.finca?.nombre?.toLowerCase().includes(q) ||
+        x.proceso?.nombre?.toLowerCase().includes(q)
+      )
+    }
+    if (filtroEval === 'evaluado') r = r.filter(x => !!x.notas)
+    if (filtroEval === 'pendiente') r = r.filter(x => !x.notas)
+    return r
+  }, [registros, filtro, filtroEval])
+
+  const pageCount = Math.ceil(filtrados.length / PAGE_SIZE)
+  const paged = filtrados.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   return (
     <div>
@@ -110,26 +121,34 @@ export default function PortalCatador({ usuario }: { usuario: UsuarioPortal }) {
         ))}
       </div>
 
-      <div className="toolbar" style={{ marginBottom: '1rem' }}>
-        <div className="toolbar-search">
+      <div className="toolbar" style={{ marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+        <div className="toolbar-search" style={{ flex: 1, minWidth: 160 }}>
           <span className="search-icon">🔍</span>
-          <input type="text" placeholder="Buscar por lote, finca, proceso…" value={filtro} onChange={e => setFiltro(e.target.value)} />
+          <input type="text" placeholder="Buscar por lote, finca, proceso…" value={filtro}
+            onChange={e => { setFiltro(e.target.value); setPage(1) }} />
         </div>
+        <select className="form-select" style={{ flex: '0 0 auto', minWidth: 150, height: 36, fontSize: '0.82rem' }}
+          value={filtroEval} onChange={e => { setFiltroEval(e.target.value); setPage(1) }}>
+          <option value="">Todos</option>
+          <option value="evaluado">✅ Evaluados</option>
+          <option value="pendiente">⏳ Pendientes</option>
+        </select>
         <span className="toolbar-count">{filtrados.length} proceso{filtrados.length !== 1 ? 's' : ''}</span>
       </div>
 
       {loading ? (
         <div className="loading-center"><div className="spinner" /><span>Cargando…</span></div>
       ) : filtrados.length === 0 ? (
-        <div className="empty-state"><div className="empty-icon">🔬</div><p>No hay procesos disponibles{filtro ? ' que coincidan' : ''}.</p></div>
+        <div className="empty-state"><div className="empty-icon">🔬</div><p>No hay procesos{filtro || filtroEval ? ' que coincidan' : ''} disponibles.</p></div>
       ) : (
+        <>
         <div className="data-table-wrap table-responsive">
           <table className="data-table">
             <thead>
               <tr><th>Proceso</th><th>Lote</th><th>Finca</th><th>Inicio</th><th>Fin</th><th>Evaluación</th><th>Acción</th></tr>
             </thead>
             <tbody>
-              {filtrados.map((r: any) => {
+              {paged.map((r: any) => {
                 const { texto, puntaje } = parseNota(r.notas)
                 const procNombre = r.proceso?.nombre?.toUpperCase() ?? ''
                 return (
@@ -167,6 +186,21 @@ export default function PortalCatador({ usuario }: { usuario: UsuarioPortal }) {
             </tbody>
           </table>
         </div>
+        {pageCount > 1 && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+            <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+              {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtrados.length)} de {filtrados.length}
+            </span>
+            <div style={{ display: 'flex', gap: '0.35rem' }}>
+              <button className="btn btn-ghost btn-sm" disabled={page === 1} onClick={() => setPage(p => p - 1)}>‹ Ant</button>
+              {Array.from({ length: Math.min(pageCount, 5) }, (_, i) => Math.max(1, Math.min(pageCount - 4, page - 2)) + i).map(p => (
+                <button key={p} className={`btn btn-sm ${p === page ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setPage(p)}>{p}</button>
+              ))}
+              <button className="btn btn-ghost btn-sm" disabled={page === pageCount} onClick={() => setPage(p => p + 1)}>Sig ›</button>
+            </div>
+          </div>
+        )}
+        </>
       )}
 
       {/* Modal cata */}
