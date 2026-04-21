@@ -252,65 +252,60 @@ export default function Movimientos() {
 
       {error && <div className="alert alert-error" style={{ marginBottom: '1rem' }}>⚠ {error}</div>}
 
-      {/* ── Filter Bar: always visible ── */}
-      <div style={{
-        display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end',
-        marginBottom: '0.85rem', background: 'var(--bg-card)',
-        border: '1px solid var(--border-soft)', borderRadius: 'var(--r-xl)', padding: '0.75rem 1rem',
-      }}>
-        {/* Search */}
-        <div style={{ flex: '0 1 260px', minWidth: 180, position: 'relative' }}>
-          <span style={{ position: 'absolute', left: '0.65rem', top: '50%', transform: 'translateY(-50%)', fontSize: '0.82rem', color: 'var(--text-muted)', pointerEvents: 'none' }}>🔍</span>
-          <input type="text" placeholder="Buscar por lote, almacén, notas…" value={search}
-            onChange={e => { setSearch(e.target.value); resetPage() }}
-            style={{ width: '100%', paddingLeft: '2rem', height: '36px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text)', fontSize: '0.82rem', fontFamily: 'var(--font-body)', outline: 'none', boxSizing: 'border-box' }}
-          />
-        </div>
-
-        {/* Tipo select */}
-        <div style={{ flex: '1 1 140px', minWidth: 130 }}>
-          <label style={{ display: 'block', fontSize: '0.62rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', marginBottom: '0.2rem' }}>Tipo</label>
-          <select value={filtroTipo} onChange={e => { setFiltroTipo(e.target.value); resetPage() }}
-            style={{ width: '100%', height: '36px', background: filtroTipo ? 'var(--primary-subtle)' : 'var(--bg-input)', border: filtroTipo ? '1px solid var(--primary)' : '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text)', fontSize: '0.8rem', fontFamily: 'var(--font-body)', padding: '0 0.5rem', outline: 'none' }}>
-            <option value="">Todos</option>
-            <option value="entrada">📥 Entrada</option>
-            <option value="salida">📤 Salida</option>
-            <option value="traslado">🔄 Traslado</option>
-          </select>
-        </div>
-
-        {/* Almacén select */}
-        <div style={{ flex: '1 1 160px', minWidth: 150 }}>
-          <label style={{ display: 'block', fontSize: '0.62rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', marginBottom: '0.2rem' }}>Almacén</label>
-          <select value={filtroAlmacen} onChange={e => { setFiltroAlmacen(e.target.value); resetPage() }}
-            style={{ width: '100%', height: '36px', background: filtroAlmacen ? 'var(--primary-subtle)' : 'var(--bg-input)', border: filtroAlmacen ? '1px solid var(--primary)' : '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text)', fontSize: '0.8rem', fontFamily: 'var(--font-body)', padding: '0 0.5rem', outline: 'none' }}>
-            <option value="">Todos</option>
-            {almacenes.map(a => <option key={a.idalmacen} value={a.idalmacen}>{a.nombre}</option>)}
-          </select>
-        </div>
-
-        {/* Date range */}
-        <div style={{ flex: '1 1 240px', minWidth: 220 }}>
-          <label style={{ display: 'block', fontSize: '0.62rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', marginBottom: '0.2rem' }}>📅 Rango de fechas</label>
-          <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
-            <input type="date" value={filtroDesde} onChange={e => { setFiltroDesde(e.target.value); resetPage() }}
-              style={{ flex: 1, height: '36px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text)', fontSize: '0.78rem', fontFamily: 'var(--font-body)', padding: '0 0.4rem', outline: 'none' }} />
-            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>–</span>
-            <input type="date" value={filtroHasta} onChange={e => { setFiltroHasta(e.target.value); resetPage() }}
-              style={{ flex: 1, height: '36px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text)', fontSize: '0.78rem', fontFamily: 'var(--font-body)', padding: '0 0.4rem', outline: 'none' }} />
+      {/* ── Filter Bar ── */}
+      <div className="filter-bar">
+        <div className="filter-row">
+          {/* Search */}
+          <div className="toolbar-search">
+            <span className="search-icon">🔍</span>
+            <input type="text" placeholder="Buscar por lote, almacén, notas…" value={search}
+              onChange={e => { setSearch(e.target.value); resetPage() }} />
           </div>
-        </div>
 
-        {/* Clear + count */}
-        <div style={{ display: 'flex', alignItems: 'flex-end', gap: '0.5rem', marginLeft: 'auto' }}>
+          {/* Tipo */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            <label style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)' }}>Tipo</label>
+            <select value={filtroTipo} onChange={e => { setFiltroTipo(e.target.value); resetPage() }}
+              style={{ height: '34px', minWidth: '130px', background: filtroTipo ? 'var(--primary-subtle)' : 'var(--bg-input)', border: filtroTipo ? '1px solid var(--primary)' : '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text)', fontSize: '0.8rem', fontFamily: 'var(--font-body)', padding: '0 0.5rem', outline: 'none', cursor: 'pointer' }}>
+              <option value="">Todos</option>
+              <option value="entrada">📥 Entrada</option>
+              <option value="salida">📤 Salida</option>
+              <option value="traslado">🔄 Traslado</option>
+            </select>
+          </div>
+
+          {/* Almacén */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            <label style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)' }}>Almacén</label>
+            <select value={filtroAlmacen} onChange={e => { setFiltroAlmacen(e.target.value); resetPage() }}
+              style={{ height: '34px', minWidth: '140px', background: filtroAlmacen ? 'var(--primary-subtle)' : 'var(--bg-input)', border: filtroAlmacen ? '1px solid var(--primary)' : '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text)', fontSize: '0.8rem', fontFamily: 'var(--font-body)', padding: '0 0.5rem', outline: 'none', cursor: 'pointer' }}>
+              <option value="">Todos</option>
+              {almacenes.map(a => <option key={a.idalmacen} value={a.idalmacen}>{a.nombre}</option>)}
+            </select>
+          </div>
+
+          {/* Fechas */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            <label style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)' }}>📅 Fecha</label>
+            <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
+              <input type="date" value={filtroDesde} onChange={e => { setFiltroDesde(e.target.value); resetPage() }}
+                style={{ height: '34px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text)', fontSize: '0.78rem', fontFamily: 'var(--font-body)', padding: '0 0.4rem', outline: 'none' }} />
+              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>–</span>
+              <input type="date" value={filtroHasta} onChange={e => { setFiltroHasta(e.target.value); resetPage() }}
+                style={{ height: '34px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text)', fontSize: '0.78rem', fontFamily: 'var(--font-body)', padding: '0 0.4rem', outline: 'none' }} />
+            </div>
+          </div>
+
+          {/* Limpiar */}
           {(search || filtroTipo || filtroAlmacen || filtroDesde || filtroHasta) && (
             <button onClick={clearAllFilters}
-              style={{ height: '36px', padding: '0 0.75rem', background: 'transparent', border: '1px solid var(--border-soft)', borderRadius: 'var(--r-md)', color: 'var(--text-muted)', fontSize: '0.78rem', cursor: 'pointer' }}>
+              style={{ height: '34px', padding: '0 0.7rem', background: 'transparent', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text-muted)', fontSize: '0.78rem', cursor: 'pointer', alignSelf: 'flex-end' }}>
               ✕ Limpiar
             </button>
           )}
-          <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', lineHeight: '36px' }}>
-            {filtered.length} mov.{data.length !== filtered.length && <span style={{ color: 'var(--text-dim)' }}> / {data.length}</span>}
+
+          <span className="toolbar-count">
+            {filtered.length} mov.{data.length !== filtered.length && <span style={{ color: 'var(--text-dim)', fontWeight: 400 }}> / {data.length}</span>}
           </span>
         </div>
       </div>

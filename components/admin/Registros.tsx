@@ -191,74 +191,73 @@ export default function Registros() {
       </div>
 
       {/* Filter bar */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end', marginBottom: '0.85rem', background: 'var(--bg-card)', border: '1px solid var(--border-soft)', borderRadius: 'var(--r-xl)', padding: '0.75rem 1rem' }}>
-        {/* Search */}
-        <div style={{ flex: '0 1 260px', minWidth: 180, position: 'relative' }}>
-          <span style={{ position: 'absolute', left: '0.65rem', top: '50%', transform: 'translateY(-50%)', fontSize: '0.82rem', color: 'var(--text-muted)', pointerEvents: 'none' }}>🔍</span>
-          <input type="text" placeholder="Buscar lote, finca, proceso, responsable…" value={search}
-            onChange={e => { setSearch(e.target.value); resetPage() }}
-            style={{ width: '100%', paddingLeft: '2rem', height: '36px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text)', fontSize: '0.82rem', fontFamily: 'var(--font-body)', outline: 'none', boxSizing: 'border-box' }} />
-        </div>
-
-        {/* Proceso */}
-        <div style={{ flex: '1 1 140px', minWidth: 130 }}>
-          <label style={{ display: 'block', fontSize: '0.62rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', marginBottom: '0.2rem' }}>Proceso</label>
-          <select value={filtroProceso} onChange={e => { setFiltroProceso(e.target.value); resetPage() }}
-            style={{ width: '100%', height: '36px', background: filtroProceso ? 'var(--primary-subtle)' : 'var(--bg-input)', border: filtroProceso ? '1px solid var(--primary)' : '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text)', fontSize: '0.8rem', fontFamily: 'var(--font-body)', padding: '0 0.5rem', outline: 'none' }}>
-            <option value="">Todos</option>
-            {procesos.map(p => <option key={p.idproceso} value={p.idproceso}>{p.nombre}</option>)}
-          </select>
-        </div>
-
-        {/* Responsable */}
-        <div style={{ flex: '1 1 150px', minWidth: 140 }}>
-          <label style={{ display: 'block', fontSize: '0.62rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', marginBottom: '0.2rem' }}>Responsable</label>
-          <select value={filtroUsuario} onChange={e => { setFiltroUsuario(e.target.value); resetPage() }}
-            style={{ width: '100%', height: '36px', background: filtroUsuario ? 'var(--primary-subtle)' : 'var(--bg-input)', border: filtroUsuario ? '1px solid var(--primary)' : '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text)', fontSize: '0.8rem', fontFamily: 'var(--font-body)', padding: '0 0.5rem', outline: 'none' }}>
-            <option value="">Todos</option>
-            {usuarios.map(u => <option key={u.idusuario} value={u.idusuario}>{u.nombre}</option>)}
-          </select>
-        </div>
-
-        {/* Calificación */}
-        <div style={{ flex: '1 1 140px', minWidth: 130 }}>
-          <label style={{ display: 'block', fontSize: '0.62rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', marginBottom: '0.2rem' }}>Calificación</label>
-          <select value={filtroCal} onChange={e => { setFiltroCal(e.target.value); resetPage() }}
-            style={{ width: '100%', height: '36px', background: filtroCal ? 'var(--primary-subtle)' : 'var(--bg-input)', border: filtroCal ? '1px solid var(--primary)' : '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text)', fontSize: '0.8rem', fontFamily: 'var(--font-body)', padding: '0 0.5rem', outline: 'none' }}>
-            <option value="">Todas</option>
-            <option value="alta">🟢 Alta (≥ 8.5)</option>
-            <option value="media">🟡 Media (6–8.4)</option>
-            <option value="baja">🔴 Baja (&lt; 6)</option>
-            <option value="sin">⏳ Sin calificar</option>
-          </select>
-        </div>
-
-        {/* Fechas */}
-        <div style={{ flex: '1 1 240px', minWidth: 220 }}>
-          <label style={{ display: 'block', fontSize: '0.62rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', marginBottom: '0.2rem' }}>📅 Rango inicio</label>
-          <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
-            <input type="date" value={filtroDesde} onChange={e => { setFiltroDesde(e.target.value); resetPage() }}
-              style={{ flex: 1, height: '36px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text)', fontSize: '0.78rem', fontFamily: 'var(--font-body)', padding: '0 0.4rem', outline: 'none' }} />
-            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>–</span>
-            <input type="date" value={filtroHasta} onChange={e => { setFiltroHasta(e.target.value); resetPage() }}
-              style={{ flex: 1, height: '36px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text)', fontSize: '0.78rem', fontFamily: 'var(--font-body)', padding: '0 0.4rem', outline: 'none' }} />
+      <div className="filter-bar">
+        <div className="filter-row">
+          {/* Search */}
+          <div className="toolbar-search">
+            <span className="search-icon">🔍</span>
+            <input type="text" placeholder="Buscar lote, finca, proceso, responsable…" value={search}
+              onChange={e => { setSearch(e.target.value); resetPage() }} />
           </div>
-        </div>
 
-        {/* Sort + clear + count */}
-        <div style={{ display: 'flex', alignItems: 'flex-end', gap: '0.4rem', marginLeft: 'auto' }}>
+          {/* Proceso */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            <label style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)' }}>Proceso</label>
+            <select value={filtroProceso} onChange={e => { setFiltroProceso(e.target.value); resetPage() }}
+              style={{ height: '34px', minWidth: '130px', background: filtroProceso ? 'var(--primary-subtle)' : 'var(--bg-input)', border: filtroProceso ? '1px solid var(--primary)' : '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text)', fontSize: '0.8rem', fontFamily: 'var(--font-body)', padding: '0 0.5rem', outline: 'none', cursor: 'pointer' }}>
+              <option value="">Todos</option>
+              {procesos.map(p => <option key={p.idproceso} value={p.idproceso}>{p.nombre}</option>)}
+            </select>
+          </div>
+
+          {/* Responsable */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            <label style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)' }}>Responsable</label>
+            <select value={filtroUsuario} onChange={e => { setFiltroUsuario(e.target.value); resetPage() }}
+              style={{ height: '34px', minWidth: '140px', background: filtroUsuario ? 'var(--primary-subtle)' : 'var(--bg-input)', border: filtroUsuario ? '1px solid var(--primary)' : '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text)', fontSize: '0.8rem', fontFamily: 'var(--font-body)', padding: '0 0.5rem', outline: 'none', cursor: 'pointer' }}>
+              <option value="">Todos</option>
+              {usuarios.map(u => <option key={u.idusuario} value={u.idusuario}>{u.nombre}</option>)}
+            </select>
+          </div>
+
+          {/* Calificación */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            <label style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)' }}>Calificación</label>
+            <select value={filtroCal} onChange={e => { setFiltroCal(e.target.value); resetPage() }}
+              style={{ height: '34px', minWidth: '130px', background: filtroCal ? 'var(--primary-subtle)' : 'var(--bg-input)', border: filtroCal ? '1px solid var(--primary)' : '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text)', fontSize: '0.8rem', fontFamily: 'var(--font-body)', padding: '0 0.5rem', outline: 'none', cursor: 'pointer' }}>
+              <option value="">Todas</option>
+              <option value="alta">🟢 Alta (≥ 8.5)</option>
+              <option value="media">🟡 Media (6–8.4)</option>
+              <option value="baja">🔴 Baja (&lt; 6)</option>
+              <option value="sin">⏳ Sin calificar</option>
+            </select>
+          </div>
+
+          {/* Fechas */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            <label style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)' }}>📅 Fecha inicio</label>
+            <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
+              <input type="date" value={filtroDesde} onChange={e => { setFiltroDesde(e.target.value); resetPage() }}
+                style={{ height: '34px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text)', fontSize: '0.78rem', fontFamily: 'var(--font-body)', padding: '0 0.4rem', outline: 'none' }} />
+              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>–</span>
+              <input type="date" value={filtroHasta} onChange={e => { setFiltroHasta(e.target.value); resetPage() }}
+                style={{ height: '34px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text)', fontSize: '0.78rem', fontFamily: 'var(--font-body)', padding: '0 0.4rem', outline: 'none' }} />
+            </div>
+          </div>
+
+          {/* Orden + Limpiar */}
           <button onClick={() => setSortDir(d => d === 'asc' ? 'desc' : 'asc')}
-            style={{ height: '36px', padding: '0 0.65rem', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text-soft)', fontSize: '0.78rem', cursor: 'pointer' }}>
+            style={{ height: '34px', padding: '0 0.65rem', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text-soft)', fontSize: '0.78rem', cursor: 'pointer', alignSelf: 'flex-end' }}>
             {sortDir === 'desc' ? '↓ Reciente' : '↑ Antiguo'}
           </button>
           {hasActiveFilter && (
             <button onClick={clearAll}
-              style={{ height: '36px', padding: '0 0.65rem', background: 'transparent', border: '1px solid var(--border-soft)', borderRadius: 'var(--r-md)', color: 'var(--text-muted)', fontSize: '0.78rem', cursor: 'pointer' }}>
+              style={{ height: '34px', padding: '0 0.7rem', background: 'transparent', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text-muted)', fontSize: '0.78rem', cursor: 'pointer', alignSelf: 'flex-end' }}>
               ✕ Limpiar
             </button>
           )}
-          <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', lineHeight: '36px' }}>
-            {filtered.length}<span style={{ color: 'var(--text-dim)' }}>/{rows.length}</span>
+          <span className="toolbar-count">
+            {filtered.length}<span style={{ color: 'var(--text-dim)', fontWeight: 400 }}>/{rows.length}</span>
           </span>
         </div>
       </div>

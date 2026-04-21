@@ -261,105 +261,81 @@ export default function CrudPage({
 
       {error && <div className="alert alert-error" style={{ marginBottom: '1rem' }}>⚠ {error}</div>}
 
-      {/* ── FILTER BAR: always visible ── */}
+      {/* ── FILTER BAR ── */}
       {hasAnyFilter && (
-        <div style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: '0.5rem',
-          alignItems: 'flex-end',
-          marginBottom: '0.85rem',
-          background: 'var(--bg-card)',
-          border: '1px solid var(--border-soft)',
-          borderRadius: 'var(--r-xl)',
-          padding: '0.75rem 1rem',
-        }}>
-          {/* Search */}
-          {hasAnySearch && (
-            <div style={{ flex: '0 1 260px', minWidth: 180, position: 'relative' }}>
-              <span style={{ position: 'absolute', left: '0.65rem', top: '50%', transform: 'translateY(-50%)', fontSize: '0.82rem', color: 'var(--text-muted)', pointerEvents: 'none' }}>🔍</span>
-              <input
-                type="text"
-                placeholder={searchPlaceholder ?? 'Buscar…'}
-                value={search}
-                onChange={e => { setSearch(e.target.value); resetPage() }}
-                style={{
-                  width: '100%', paddingLeft: '2rem', height: '36px',
-                  background: 'var(--bg-input)', border: '1px solid var(--border)',
-                  borderRadius: 'var(--r-md)', color: 'var(--text)',
-                  fontSize: '0.82rem', fontFamily: 'var(--font-body)',
-                  transition: 'border-color var(--t)',
-                  outline: 'none',
-                  boxSizing: 'border-box',
-                }}
-                onFocus={e => (e.target.style.borderColor = 'var(--primary)')}
-                onBlur={e => (e.target.style.borderColor = 'var(--border)')}
-              />
-            </div>
-          )}
-
-          {/* Select filters */}
-          {filterSelects?.map(fs => (
-            <div key={fs.key} style={{ flex: '1 1 150px', minWidth: 140 }}>
-              <label style={{ display: 'block', fontSize: '0.62rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', marginBottom: '0.2rem' }}>
-                {fs.label}
-              </label>
-              <select
-                value={filterValues[fs.key] ?? ''}
-                onChange={e => { setFilterValues(p => ({ ...p, [fs.key]: e.target.value })); resetPage() }}
-                style={{
-                  width: '100%', height: '36px',
-                  background: filterValues[fs.key] ? 'var(--primary-subtle)' : 'var(--bg-input)',
-                  border: filterValues[fs.key] ? '1px solid var(--primary)' : '1px solid var(--border)',
-                  borderRadius: 'var(--r-md)', color: 'var(--text)',
-                  fontSize: '0.8rem', fontFamily: 'var(--font-body)',
-                  padding: '0 0.5rem',
-                  outline: 'none',
-                }}
-              >
-                <option value="">Todos</option>
-                {fs.options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </select>
-            </div>
-          ))}
-
-          {/* Date filters */}
-          {dateFilters?.map(df => (
-            <div key={df.key} style={{ flex: '1 1 240px', minWidth: 220 }}>
-              <label style={{ display: 'block', fontSize: '0.62rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', marginBottom: '0.2rem' }}>
-                📅 {df.label}
-              </label>
-              <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
+        <div className="filter-bar">
+          <div className="filter-row">
+            {/* Search – usa las mismas clases CSS que el resto del sistema */}
+            {hasAnySearch && (
+              <div className="toolbar-search">
+                <span className="search-icon">🔍</span>
                 <input
-                  type="date"
-                  value={dateFrom[df.key] ?? ''}
-                  onChange={e => { setDateFrom(p => ({ ...p, [df.key]: e.target.value })); resetPage() }}
-                  style={{ flex: 1, height: '36px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text)', fontSize: '0.78rem', fontFamily: 'var(--font-body)', padding: '0 0.4rem', outline: 'none' }}
-                />
-                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>–</span>
-                <input
-                  type="date"
-                  value={dateTo[df.key] ?? ''}
-                  onChange={e => { setDateTo(p => ({ ...p, [df.key]: e.target.value })); resetPage() }}
-                  style={{ flex: 1, height: '36px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text)', fontSize: '0.78rem', fontFamily: 'var(--font-body)', padding: '0 0.4rem', outline: 'none' }}
+                  type="text"
+                  placeholder={searchPlaceholder ?? 'Buscar…'}
+                  value={search}
+                  onChange={e => { setSearch(e.target.value); resetPage() }}
                 />
               </div>
-            </div>
-          ))}
+            )}
 
-          {/* Clear + count */}
-          <div style={{ display: 'flex', alignItems: 'flex-end', gap: '0.5rem', marginLeft: 'auto' }}>
+            {/* Select filters */}
+            {filterSelects && filterSelects.length > 0 && filterSelects.map(fs => (
+              <div key={fs.key} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                <label style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)' }}>
+                  {fs.label}
+                </label>
+                <select
+                  value={filterValues[fs.key] ?? ''}
+                  onChange={e => { setFilterValues(p => ({ ...p, [fs.key]: e.target.value })); resetPage() }}
+                  style={{
+                    height: '34px', minWidth: '130px',
+                    background: filterValues[fs.key] ? 'var(--primary-subtle)' : 'var(--bg-input)',
+                    border: filterValues[fs.key] ? '1px solid var(--primary)' : '1px solid var(--border)',
+                    borderRadius: 'var(--r-md)', color: 'var(--text)',
+                    fontSize: '0.8rem', fontFamily: 'var(--font-body)',
+                    padding: '0 0.5rem', outline: 'none', cursor: 'pointer',
+                  }}
+                >
+                  <option value="">Todos</option>
+                  {fs.options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+              </div>
+            ))}
+
+            {/* Date filters */}
+            {dateFilters && dateFilters.length > 0 && dateFilters.map(df => (
+              <div key={df.key} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                <label style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)' }}>
+                  📅 {df.label}
+                </label>
+                <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
+                  <input type="date" value={dateFrom[df.key] ?? ''}
+                    onChange={e => { setDateFrom(p => ({ ...p, [df.key]: e.target.value })); resetPage() }}
+                    style={{ height: '34px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text)', fontSize: '0.78rem', fontFamily: 'var(--font-body)', padding: '0 0.4rem', outline: 'none' }}
+                  />
+                  <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>–</span>
+                  <input type="date" value={dateTo[df.key] ?? ''}
+                    onChange={e => { setDateTo(p => ({ ...p, [df.key]: e.target.value })); resetPage() }}
+                    style={{ height: '34px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text)', fontSize: '0.78rem', fontFamily: 'var(--font-body)', padding: '0 0.4rem', outline: 'none' }}
+                  />
+                </div>
+              </div>
+            ))}
+
+            {/* Limpiar */}
             {(hasFilters || search) && (
               <button
                 onClick={() => { clearAll(); setSearch(''); resetPage() }}
-                style={{ height: '36px', padding: '0 0.75rem', background: 'transparent', border: '1px solid var(--border-soft)', borderRadius: 'var(--r-md)', color: 'var(--text-muted)', fontSize: '0.78rem', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                style={{ height: '34px', padding: '0 0.7rem', background: 'transparent', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text-muted)', fontSize: '0.78rem', cursor: 'pointer', whiteSpace: 'nowrap', alignSelf: 'flex-end' }}
               >
                 ✕ Limpiar
               </button>
             )}
-            <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', lineHeight: '36px' }}>
+
+            {/* Conteo */}
+            <span className="toolbar-count">
               {filtered.length} registro{filtered.length !== 1 ? 's' : ''}
-              {data.length !== filtered.length && <span style={{ color: 'var(--text-dim)' }}> / {data.length}</span>}
+              {data.length !== filtered.length && <span style={{ color: 'var(--text-dim)', fontWeight: 400 }}> / {data.length}</span>}
             </span>
           </div>
         </div>
