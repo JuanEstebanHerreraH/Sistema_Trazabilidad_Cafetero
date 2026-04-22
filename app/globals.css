@@ -112,10 +112,6 @@ input, select, textarea { font-family: var(--font-body); }
   box-sizing: border-box;
 }
 
-@media (min-width: 1600px) {
-  .dash-content { padding: 2rem 2.5rem; }
-}
-
 @media (max-width: 640px) {
   .dash-content { padding: 1rem; }
 }

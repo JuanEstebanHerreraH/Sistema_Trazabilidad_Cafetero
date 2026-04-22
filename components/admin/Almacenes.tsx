@@ -27,7 +27,6 @@ export default function Almacenes() {
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const PAGE_SIZE_A = 12
-  const [panelOpen, setPanelOpen] = useState(false)
 
   // Modal crear/editar
   const [modalOpen, setModalOpen] = useState(false)
@@ -134,6 +133,7 @@ export default function Almacenes() {
   const [filtroEstado, setFiltroEstado] = useState('')
   const [capacidadMin, setCapacidadMin] = useState('')
   const [capacidadMax, setCapacidadMax] = useState('')
+  const [panelOpen, setPanelOpen] = useState(false)
 
   const filtered = almacenes.filter(a => {
     const matchSearch = !search || a.nombre.toLowerCase().includes(search.toLowerCase()) ||
@@ -149,9 +149,6 @@ export default function Almacenes() {
     const matchCapMax = !capacidadMax || (a.capacidad_kg != null && a.capacidad_kg <= Number(capacidadMax))
     return matchSearch && matchEstado && matchCapMin && matchCapMax
   })
-
-  const hasActiveFilter = !!(search || filtroEstado || capacidadMin || capacidadMax)
-  const clearAllFilters = () => { setSearch(''); setFiltroEstado(''); setCapacidadMin(''); setCapacidadMax(''); setPage(1) }
 
   const pageCount = Math.ceil(filtered.length / PAGE_SIZE_A)
   const paged = filtered.slice((page - 1) * PAGE_SIZE_A, page * PAGE_SIZE_A)
@@ -210,63 +207,65 @@ export default function Almacenes() {
       </div>
 
       {/* Filter Bar */}
-      <div className="filter-bar">
-        <div className="filter-row">
-          <div className="toolbar-search">
-            <span className="search-icon">🔍</span>
-            <input type="text" placeholder="Buscar almacén o ubicación…" value={search} onChange={e => { setSearch(e.target.value); setPage(1) }} />
+      <div style={{ marginBottom: '1rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <div style={{ position: 'relative', flex: 1, minWidth: '180px', maxWidth: '360px' }}>
+            <span style={{ position: 'absolute', left: '0.7rem', top: '50%', transform: 'translateY(-50%)', opacity: 0.5, fontSize: '0.85rem', pointerEvents: 'none' }}>🔍</span>
+            <input type="text" placeholder="Buscar almacén o ubicación…" value={search}
+              onChange={e => { setSearch(e.target.value); setPage(1) }}
+              style={{ width: '100%', height: '36px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', padding: '0 0.9rem 0 2.2rem', color: 'var(--text)', fontSize: '0.84rem', fontFamily: 'var(--font-body)', outline: 'none' }} />
           </div>
 
-          <button className={`btn-filter${(filtroEstado || capacidadMin || capacidadMax) ? ' active' : ''}`}
-            onClick={() => setPanelOpen(v => !v)}>
-            ⚙ Filtros
-            {[filtroEstado, capacidadMin || capacidadMax].filter(Boolean).length > 0 && (
-              <span className="filter-badge">{[filtroEstado, capacidadMin || capacidadMax].filter(Boolean).length}</span>
+          {/* Quick occupation filter (always visible) */}
+          <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap' }}>
+            {([
+              { v: '',           lbl: 'Todos' },
+              { v: 'disponible', lbl: '🟢 Espacio' },
+              { v: 'casi_lleno', lbl: '🟡 Casi lleno' },
+              { v: 'lleno',      lbl: '🔴 Lleno' },
+              { v: 'sin_limite', lbl: '∞ Sin límite' },
+            ] as const).map(o => (
+              <button key={o.v}
+                onClick={() => { setFiltroEstado(o.v); setPage(1) }}
+                style={{ height: '36px', padding: '0 0.65rem', borderRadius: 'var(--r-md)', border: filtroEstado === o.v ? '1px solid var(--primary)' : '1px solid var(--border)', background: filtroEstado === o.v ? 'rgba(196,122,44,0.12)' : 'var(--bg-input)', color: filtroEstado === o.v ? 'var(--primary)' : 'var(--text-soft)', fontSize: '0.78rem', fontFamily: 'var(--font-body)', cursor: 'pointer', whiteSpace: 'nowrap', fontWeight: filtroEstado === o.v ? 600 : 400 }}>
+                {o.lbl}
+              </button>
+            ))}
+          </div>
+
+          {/* More filters button */}
+          <button
+            onClick={() => setPanelOpen(v => !v)}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', height: '36px', padding: '0 0.9rem', borderRadius: 'var(--r-md)', border: (panelOpen || capacidadMin || capacidadMax) ? '1px solid var(--primary)' : '1px solid var(--border)', background: (panelOpen || capacidadMin || capacidadMax) ? 'rgba(196,122,44,0.12)' : 'var(--bg-input)', color: (panelOpen || capacidadMin || capacidadMax) ? 'var(--primary)' : 'var(--text-soft)', fontSize: '0.82rem', fontFamily: 'var(--font-body)', cursor: 'pointer', fontWeight: (capacidadMin || capacidadMax) ? 600 : 400 }}>
+            🎯 Filtros
+            {(capacidadMin || capacidadMax) && (
+              <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '18px', height: '18px', borderRadius: '99px', background: 'var(--primary)', color: '#fff', fontSize: '0.65rem', fontWeight: 700 }}>1</span>
             )}
+            <span style={{ fontSize: '0.7rem', opacity: 0.6 }}>{panelOpen ? '▲' : '▼'}</span>
           </button>
 
-          {hasActiveFilter && (
-            <button onClick={clearAllFilters}
-              style={{ height: '34px', padding: '0 0.7rem', background: 'transparent', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text-muted)', fontSize: '0.78rem', cursor: 'pointer' }}>
+          {(search || filtroEstado || capacidadMin || capacidadMax) && (
+            <button onClick={() => { setSearch(''); setFiltroEstado(''); setCapacidadMin(''); setCapacidadMax(''); setPage(1) }}
+              style={{ height: '36px', padding: '0 0.8rem', background: 'transparent', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text-muted)', fontSize: '0.8rem', fontFamily: 'var(--font-body)', cursor: 'pointer' }}>
               ✕ Limpiar
             </button>
           )}
 
-          <span className="toolbar-count" style={{ marginLeft: 'auto' }}>
+          <span style={{ fontSize: '0.78rem', color: 'var(--text-dim)', fontWeight: 500, marginLeft: 'auto' }}>
             {filtered.length}{filtered.length !== almacenes.length && <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}> de {almacenes.length}</span>} almacenes
           </span>
         </div>
 
         {panelOpen && (
-          <div className="filter-panel">
-            {/* Ocupación */}
-            <div className="form-group" style={{ margin: 0, gridColumn: 'span 2' }}>
-              <label className="form-label" style={{ fontSize: '0.72rem' }}>Estado de ocupación</label>
-              <div className="filter-segments" style={{ flexWrap: 'wrap' }}>
-                {([
-                  { v: '',           lbl: 'Todos' },
-                  { v: 'disponible', lbl: '🟢 Con espacio' },
-                  { v: 'casi_lleno', lbl: '🟡 Casi lleno' },
-                  { v: 'lleno',      lbl: '🔴 Lleno' },
-                  { v: 'sin_limite', lbl: '∞ Sin límite' },
-                ] as const).map(o => (
-                  <button key={o.v} className={`filter-seg${filtroEstado === o.v ? ' active' : ''}`}
-                    onClick={() => { setFiltroEstado(o.v); setPage(1) }}>{o.lbl}</button>
-                ))}
-              </div>
-            </div>
-
-            {/* Capacidad min */}
-            <div className="form-group" style={{ margin: 0, minWidth: 200 }}>
-              <label className="form-label" style={{ fontSize: '0.72rem' }}>Capacidad (kg)</label>
+          <div style={{ marginTop: '0.5rem', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--r-lg)', padding: '1rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '0.75rem' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', marginBottom: '0.3rem' }}>Capacidad máx. (kg)</label>
               <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
-                <input type="number" className="form-input" placeholder="Mín"
-                  style={{ height: '36px', fontSize: '0.82rem', flex: 1, background: capacidadMin ? 'var(--primary-subtle)' : undefined, border: capacidadMin ? '1px solid var(--primary)' : undefined }}
-                  value={capacidadMin} onChange={e => { setCapacidadMin(e.target.value); setPage(1) }} />
-                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>–</span>
-                <input type="number" className="form-input" placeholder="Máx"
-                  style={{ height: '36px', fontSize: '0.82rem', flex: 1, background: capacidadMax ? 'var(--primary-subtle)' : undefined, border: capacidadMax ? '1px solid var(--primary)' : undefined }}
-                  value={capacidadMax} onChange={e => { setCapacidadMax(e.target.value); setPage(1) }} />
+                <input type="number" placeholder="Mín" value={capacidadMin} onChange={e => { setCapacidadMin(e.target.value); setPage(1) }}
+                  style={{ flex: 1, height: '36px', background: (capacidadMin || capacidadMax) ? 'rgba(196,122,44,0.08)' : 'var(--bg-input)', border: (capacidadMin || capacidadMax) ? '1px solid var(--primary)' : '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text)', fontSize: '0.78rem', fontFamily: 'var(--font-body)', padding: '0 0.4rem', outline: 'none' }} />
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', flexShrink: 0 }}>–</span>
+                <input type="number" placeholder="Máx" value={capacidadMax} onChange={e => { setCapacidadMax(e.target.value); setPage(1) }}
+                  style={{ flex: 1, height: '36px', background: (capacidadMin || capacidadMax) ? 'rgba(196,122,44,0.08)' : 'var(--bg-input)', border: (capacidadMin || capacidadMax) ? '1px solid var(--primary)' : '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text)', fontSize: '0.78rem', fontFamily: 'var(--font-body)', padding: '0 0.4rem', outline: 'none' }} />
               </div>
             </div>
           </div>
