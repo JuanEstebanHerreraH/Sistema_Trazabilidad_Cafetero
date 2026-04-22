@@ -17,7 +17,12 @@ const estadoBadge: Record<string,string> = {
 }
 
 export default function LotesCafe() {
-  const { data: fincas } = useRead('finca', 'idfinca, nombre', 'nombre')
+  const { data: fincas }   = useRead('finca',     'idfinca, nombre',   'nombre')
+  const { data: lotesList } = useRead('lote_cafe', 'variedad',          'variedad')
+
+  // Build unique variedad options from loaded lotes
+  const variedades = Array.from(new Set(lotesList.map((l: any) => l.variedad).filter(Boolean)))
+    .map(v => ({ value: String(v), label: String(v) }))
 
   const fields = [
     {
@@ -59,10 +64,15 @@ export default function LotesCafe() {
       filterSelects={[
         { key: 'estado', label: 'Estado', options: ESTADOS },
         ...(fincas.length > 0 ? [{ key: 'idfinca', label: 'Finca', options: fincas.map(f => ({ value: String(f.idfinca), label: f.nombre })) }] : []),
+        ...(variedades.length > 0 ? [{ key: 'variedad', label: 'Variedad', options: variedades }] : []),
       ]}
       dateFilters={[
         { key: 'fecha_cosecha', label: 'Fecha cosecha' },
       ]}
+      rangeFilters={[
+        { key: 'peso_kg', label: 'Stock', unit: 'kg' },
+      ]}
     />
   )
 }
+

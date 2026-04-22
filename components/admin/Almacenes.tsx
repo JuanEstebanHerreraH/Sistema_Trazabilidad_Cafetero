@@ -131,6 +131,8 @@ export default function Almacenes() {
   }
 
   const [filtroEstado, setFiltroEstado] = useState('')
+  const [capacidadMin, setCapacidadMin] = useState('')
+  const [capacidadMax, setCapacidadMax] = useState('')
 
   const filtered = almacenes.filter(a => {
     const matchSearch = !search || a.nombre.toLowerCase().includes(search.toLowerCase()) ||
@@ -142,8 +144,13 @@ export default function Almacenes() {
       filtroEstado === 'casi_lleno' ? pct >= 80 && pct < 100 :
       filtroEstado === 'disponible' ? pct < 80 :
       filtroEstado === 'sin_limite' ? (a.capacidad_kg == null || a.capacidad_kg <= 0) : true
-    return matchSearch && matchEstado
+    const matchCapMin = !capacidadMin || (a.capacidad_kg != null && a.capacidad_kg >= Number(capacidadMin))
+    const matchCapMax = !capacidadMax || (a.capacidad_kg != null && a.capacidad_kg <= Number(capacidadMax))
+    return matchSearch && matchEstado && matchCapMin && matchCapMax
   })
+
+  const hasActiveFilter = !!(search || filtroEstado || capacidadMin || capacidadMax)
+  const clearAllFilters = () => { setSearch(''); setFiltroEstado(''); setCapacidadMin(''); setCapacidadMax(''); setPage(1) }
 
   const pageCount = Math.ceil(filtered.length / PAGE_SIZE_A)
   const paged = filtered.slice((page - 1) * PAGE_SIZE_A, page * PAGE_SIZE_A)
@@ -220,6 +227,29 @@ export default function Almacenes() {
                 onClick={() => { setFiltroEstado(o.v); setPage(1) }}>{o.lbl}</button>
             ))}
           </div>
+
+          {/* Rango capacidad */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            <label style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)' }}>Capacidad (kg)</label>
+            <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
+              <input type="number" placeholder="Mín"
+                value={capacidadMin}
+                onChange={e => { setCapacidadMin(e.target.value); setPage(1) }}
+                style={{ height: '34px', width: '82px', background: capacidadMin ? 'var(--primary-subtle)' : 'var(--bg-input)', border: capacidadMin ? '1px solid var(--primary)' : '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text)', fontSize: '0.78rem', fontFamily: 'var(--font-body)', padding: '0 0.4rem', outline: 'none' }} />
+              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>–</span>
+              <input type="number" placeholder="Máx"
+                value={capacidadMax}
+                onChange={e => { setCapacidadMax(e.target.value); setPage(1) }}
+                style={{ height: '34px', width: '82px', background: capacidadMax ? 'var(--primary-subtle)' : 'var(--bg-input)', border: capacidadMax ? '1px solid var(--primary)' : '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text)', fontSize: '0.78rem', fontFamily: 'var(--font-body)', padding: '0 0.4rem', outline: 'none' }} />
+            </div>
+          </div>
+
+          {hasActiveFilter && (
+            <button onClick={clearAllFilters}
+              style={{ height: '34px', padding: '0 0.7rem', background: 'transparent', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text-muted)', fontSize: '0.78rem', cursor: 'pointer', alignSelf: 'flex-end', whiteSpace: 'nowrap' }}>
+              ✕ Limpiar
+            </button>
+          )}
           <span className="toolbar-count" style={{ marginLeft: 'auto' }}>
             {filtered.length}{filtered.length !== almacenes.length && <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}> de {almacenes.length}</span>} almacenes
           </span>

@@ -33,6 +33,9 @@ export default function Fincas() {
       filterSelects={[
         ...(productores.length > 0 ? [{ key: 'idproductor', label: 'Productor', options: productores.map(p => ({ value: String(p.idproductor), label: p.nombre })) }] : []),
       ]}
+      rangeFilters={[
+        { key: 'area_hectareas', label: 'Área', unit: 'ha' },
+      ]}
     />
   )
 }

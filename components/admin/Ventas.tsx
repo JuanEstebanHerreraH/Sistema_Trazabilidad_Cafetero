@@ -97,6 +97,15 @@ export default function Ventas() {
         dateFilters={[
           { key: 'fecha_venta', label: 'Fecha de venta' },
         ]}
+        rangeFilters={[
+          { key: 'total_kg',  label: 'Total kg' },
+          {
+            key: 'total_cop',
+            label: 'Total COP',
+            unit: '$',
+            getValue: (row: any) => (Number(row.total_kg ?? 0) * Number(row.precio_kg ?? 0)),
+          },
+        ]}
       />
 
       <Modal

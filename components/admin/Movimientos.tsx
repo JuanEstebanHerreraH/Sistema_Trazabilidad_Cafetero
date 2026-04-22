@@ -45,6 +45,8 @@ export default function Movimientos() {
   const [filtroAlmacen, setFiltroAlmacen] = useState('')
   const [filtroDesde, setFiltroDesde] = useState('')
   const [filtroHasta, setFiltroHasta] = useState('')
+  const [cantidadMin, setCantidadMin] = useState('')
+  const [cantidadMax, setCantidadMax] = useState('')
   const [sortKey, setSortKey]         = useState<string | null>('fecha_movimiento')
   const [sortDir, setSortDir]         = useState<'asc' | 'desc'>('desc')
   const [page, setPage]               = useState(1)
@@ -107,7 +109,7 @@ export default function Movimientos() {
   // ── Computed filters ────────────────────────────────
   const clearAllFilters = () => {
     setSearch(''); setFiltroTipo(''); setFiltroAlmacen('')
-    setFiltroDesde(''); setFiltroHasta(''); setPage(1)
+    setFiltroDesde(''); setFiltroHasta(''); setCantidadMin(''); setCantidadMax(''); setPage(1)
   }
 
   const filtered = useMemo(() => {
@@ -129,6 +131,8 @@ export default function Movimientos() {
     }
     if (filtroDesde) r = r.filter(row => row.fecha_movimiento && new Date(row.fecha_movimiento) >= new Date(filtroDesde))
     if (filtroHasta) r = r.filter(row => row.fecha_movimiento && new Date(row.fecha_movimiento) <= new Date(filtroHasta + 'T23:59:59'))
+    if (cantidadMin) r = r.filter(row => Number(row.cantidad ?? 0) >= Number(cantidadMin))
+    if (cantidadMax) r = r.filter(row => Number(row.cantidad ?? 0) <= Number(cantidadMax))
     if (sortKey) {
       r = [...r].sort((a, b) => {
         const av = a[sortKey] ?? ''
@@ -138,7 +142,7 @@ export default function Movimientos() {
       })
     }
     return r
-  }, [data, search, filtroTipo, filtroAlmacen, filtroDesde, filtroHasta, sortKey, sortDir])
+  }, [data, search, filtroTipo, filtroAlmacen, filtroDesde, filtroHasta, cantidadMin, cantidadMax, sortKey, sortDir])
 
   const pageCount = Math.ceil(filtered.length / PAGE_SIZE)
   const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
@@ -296,8 +300,24 @@ export default function Movimientos() {
             </div>
           </div>
 
+          {/* Cantidad rango */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            <label style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)' }}>Cantidad (kg)</label>
+            <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
+              <input type="number" placeholder="Mín"
+                value={cantidadMin}
+                onChange={e => { setCantidadMin(e.target.value); resetPage() }}
+                style={{ height: '34px', width: '80px', background: cantidadMin ? 'var(--primary-subtle)' : 'var(--bg-input)', border: cantidadMin ? '1px solid var(--primary)' : '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text)', fontSize: '0.78rem', fontFamily: 'var(--font-body)', padding: '0 0.4rem', outline: 'none' }} />
+              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>–</span>
+              <input type="number" placeholder="Máx"
+                value={cantidadMax}
+                onChange={e => { setCantidadMax(e.target.value); resetPage() }}
+                style={{ height: '34px', width: '80px', background: cantidadMax ? 'var(--primary-subtle)' : 'var(--bg-input)', border: cantidadMax ? '1px solid var(--primary)' : '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text)', fontSize: '0.78rem', fontFamily: 'var(--font-body)', padding: '0 0.4rem', outline: 'none' }} />
+            </div>
+          </div>
+
           {/* Limpiar */}
-          {(search || filtroTipo || filtroAlmacen || filtroDesde || filtroHasta) && (
+          {(search || filtroTipo || filtroAlmacen || filtroDesde || filtroHasta || cantidadMin || cantidadMax) && (
             <button onClick={clearAllFilters}
               style={{ height: '34px', padding: '0 0.7rem', background: 'transparent', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text-muted)', fontSize: '0.78rem', cursor: 'pointer', alignSelf: 'flex-end' }}>
               ✕ Limpiar

@@ -37,6 +37,13 @@ export interface DateRangeFilter {
   label: string
 }
 
+export interface RangeFilter {
+  key: string
+  label: string
+  unit?: string
+  getValue?: (row: any) => number
+}
+
 interface CrudPageProps {
   title: string
   subtitle?: string
@@ -53,6 +60,7 @@ interface CrudPageProps {
   extraActions?: (row: any) => ReactNode
   filterSelects?: FilterSelect[]
   dateFilters?: DateRangeFilter[]
+  rangeFilters?: RangeFilter[]
 }
 
 type SortDir = 'asc' | 'desc' | null
@@ -61,7 +69,7 @@ export default function CrudPage({
   title, subtitle, icon, table, idField,
   selectQuery = '*', orderBy, columns, fields,
   searchKey, searchKeys, searchPlaceholder,
-  extraActions, filterSelects, dateFilters,
+  extraActions, filterSelects, dateFilters, rangeFilters,
 }: CrudPageProps) {
   const { data, loading, error, insert, update, remove } = useCrud(table, idField, selectQuery, orderBy)
 
@@ -69,6 +77,8 @@ export default function CrudPage({
   const [filterValues, setFilterValues] = useState<Record<string, string>>({})
   const [dateFrom, setDateFrom] = useState<Record<string, string>>({})
   const [dateTo, setDateTo] = useState<Record<string, string>>({})
+  const [rangeMin, setRangeMin] = useState<Record<string, string>>({})
+  const [rangeMax, setRangeMax] = useState<Record<string, string>>({})
   const [panelOpen, setPanelOpen] = useState(false)
   const [sortKey, setSortKey] = useState<string | null>(null)
   const [sortDir, setSortDir] = useState<SortDir>(null)
@@ -91,19 +101,24 @@ export default function CrudPage({
   const hasFilters = useMemo(() => {
     const hasSelects = filterSelects?.some(fs => filterValues[fs.key]) ?? false
     const hasDates = dateFilters?.some(df => dateFrom[df.key] || dateTo[df.key]) ?? false
-    return hasSelects || hasDates
-  }, [filterValues, dateFrom, dateTo, filterSelects, dateFilters])
+    const hasRanges = rangeFilters?.some(rf => rangeMin[rf.key] || rangeMax[rf.key]) ?? false
+    return hasSelects || hasDates || hasRanges
+  }, [filterValues, dateFrom, dateTo, rangeMin, rangeMax, filterSelects, dateFilters, rangeFilters])
 
   const activeFilterCount = useMemo(() => {
     let count = 0
     filterSelects?.forEach(fs => { if (filterValues[fs.key]) count++ })
     dateFilters?.forEach(df => { if (dateFrom[df.key] || dateTo[df.key]) count++ })
+    rangeFilters?.forEach(rf => { if (rangeMin[rf.key] || rangeMax[rf.key]) count++ })
     return count
-  }, [filterValues, dateFrom, dateTo, filterSelects, dateFilters])
+  }, [filterValues, dateFrom, dateTo, rangeMin, rangeMax, filterSelects, dateFilters, rangeFilters])
 
-  const clearFilter = useCallback((key: string, type: 'select' | 'date') => {
+  const clearFilter = useCallback((key: string, type: 'select' | 'date' | 'range') => {
     if (type === 'select') setFilterValues(p => { const n = { ...p }; delete n[key]; return n })
-    else {
+    else if (type === 'range') {
+      setRangeMin(p => { const n = { ...p }; delete n[key]; return n })
+      setRangeMax(p => { const n = { ...p }; delete n[key]; return n })
+    } else {
       setDateFrom(p => { const n = { ...p }; delete n[key]; return n })
       setDateTo(p => { const n = { ...p }; delete n[key]; return n })
     }
@@ -113,6 +128,8 @@ export default function CrudPage({
     setFilterValues({})
     setDateFrom({})
     setDateTo({})
+    setRangeMin({})
+    setRangeMax({})
     setSearch('')
     setPage(1)
   }, [])
@@ -141,6 +158,13 @@ export default function CrudPage({
       if (from) result = result.filter(row => row[df.key] && new Date(row[df.key]) >= new Date(from))
       if (to) result = result.filter(row => row[df.key] && new Date(row[df.key]) <= new Date(to + 'T23:59:59'))
     })
+    rangeFilters?.forEach(rf => {
+      const min = rangeMin[rf.key]
+      const max = rangeMax[rf.key]
+      const getValue = rf.getValue ?? ((row: any) => Number(row[rf.key] ?? 0))
+      if (min) result = result.filter(row => getValue(row) >= Number(min))
+      if (max) result = result.filter(row => getValue(row) <= Number(max))
+    })
     if (sortKey && sortDir) {
       result = [...result].sort((a, b) => {
         const cmp = String(a[sortKey] ?? '').localeCompare(String(b[sortKey] ?? ''), 'es', { numeric: true })
@@ -149,7 +173,7 @@ export default function CrudPage({
     }
     return result
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data, search, filterValues, filterSelects, dateFilters, dateFrom, dateTo, sortKey, sortDir])
+  }, [data, search, filterValues, filterSelects, dateFilters, rangeFilters, dateFrom, dateTo, rangeMin, rangeMax, sortKey, sortDir])
 
   const pageCount = Math.ceil(filtered.length / PAGE_SIZE)
   const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
@@ -244,7 +268,8 @@ export default function CrudPage({
   const hasAnySearch = !!(searchKey || (searchKeys && searchKeys.length > 0))
   const hasSelects = filterSelects && filterSelects.length > 0
   const hasDates = dateFilters && dateFilters.length > 0
-  const hasAnyFilter = hasAnySearch || hasSelects || hasDates
+  const hasRanges = rangeFilters && rangeFilters.length > 0
+  const hasAnyFilter = hasAnySearch || hasSelects || hasDates || hasRanges
 
   return (
     <div>
@@ -321,6 +346,33 @@ export default function CrudPage({
                 </div>
               </div>
             ))}
+
+            {/* Range filters */}
+            {rangeFilters && rangeFilters.length > 0 && rangeFilters.map(rf => {
+              const active = !!(rangeMin[rf.key] || rangeMax[rf.key])
+              return (
+                <div key={rf.key} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                  <label style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)' }}>
+                    {rf.label}{rf.unit ? ` (${rf.unit})` : ''}
+                  </label>
+                  <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
+                    <input
+                      type="number" placeholder="Mín"
+                      value={rangeMin[rf.key] ?? ''}
+                      onChange={e => { setRangeMin(p => ({ ...p, [rf.key]: e.target.value })); resetPage() }}
+                      style={{ height: '34px', width: '80px', background: active ? 'var(--primary-subtle)' : 'var(--bg-input)', border: active ? '1px solid var(--primary)' : '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text)', fontSize: '0.78rem', fontFamily: 'var(--font-body)', padding: '0 0.4rem', outline: 'none' }}
+                    />
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>–</span>
+                    <input
+                      type="number" placeholder="Máx"
+                      value={rangeMax[rf.key] ?? ''}
+                      onChange={e => { setRangeMax(p => ({ ...p, [rf.key]: e.target.value })); resetPage() }}
+                      style={{ height: '34px', width: '80px', background: active ? 'var(--primary-subtle)' : 'var(--bg-input)', border: active ? '1px solid var(--primary)' : '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text)', fontSize: '0.78rem', fontFamily: 'var(--font-body)', padding: '0 0.4rem', outline: 'none' }}
+                    />
+                  </div>
+                </div>
+              )
+            })}
 
             {/* Limpiar */}
             {(hasFilters || search) && (

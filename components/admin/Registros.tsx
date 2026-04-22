@@ -313,9 +313,14 @@ export default function Registros() {
                       ) : <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>—</span>}
                     </td>
                     <td style={{ textAlign: 'center' }}>{estrellas(r.calificacion)}</td>
-                    <td style={{ maxWidth: 160, fontSize: '0.75rem', color: 'var(--text-dim)' }}>
+                    <td style={{ maxWidth: 240, fontSize: '0.78rem', color: 'var(--text-dim)' }}>
                       {r.notas ? (
-                        <span title={r.notas}>{r.notas.length > 40 ? r.notas.slice(0, 40) + '…' : r.notas}</span>
+                        <span
+                          title={r.notas}
+                          style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', lineHeight: 1.4 }}
+                        >
+                          {r.notas}
+                        </span>
                       ) : '—'}
                     </td>
                     <td>
@@ -388,7 +393,7 @@ export default function Registros() {
               {viewRecord.notas && (
                 <div style={{ background: 'var(--bg)', borderRadius: 'var(--r-lg)', padding: '0.75rem 1rem' }}>
                   <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', marginBottom: '0.4rem' }}>Notas del proceso</div>
-                  <p style={{ fontSize: '0.84rem', color: 'var(--text-soft)', margin: 0, lineHeight: 1.5 }}>{viewRecord.notas}</p>
+                  <p style={{ fontSize: '0.84rem', color: 'var(--text-soft)', margin: 0, lineHeight: 1.6, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{viewRecord.notas}</p>
                 </div>
               )}
             </div>
@@ -450,9 +455,10 @@ export default function Registros() {
                 </div>
                 <div className="form-group" style={{ gridColumn: '1 / -1' }}>
                   <label className="form-label">Notas</label>
-                  <textarea className="form-textarea" rows={3}
-                    placeholder="Temperatura, pH, condiciones climáticas, observaciones…"
-                    value={form.notas ?? ''} onChange={e => setForm(p => ({ ...p, notas: e.target.value }))} />
+                  <textarea className="form-textarea" rows={5}
+                    placeholder="Temperatura, pH, condiciones climáticas, observaciones detalladas…"
+                    value={form.notas ?? ''} onChange={e => setForm(p => ({ ...p, notas: e.target.value }))}
+                    style={{ minHeight: '120px', resize: 'vertical' }} />
                 </div>
               </div>
             </div>

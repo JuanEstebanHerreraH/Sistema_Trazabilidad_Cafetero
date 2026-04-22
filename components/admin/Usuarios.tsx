@@ -59,6 +59,9 @@ export default function Usuarios() {
           { value: 'rechazado', label: '❌ Rechazado' },
         ]},
       ]}
+      dateFilters={[
+        { key: 'fecha_registro', label: 'Registro' },
+      ]}
     />
   )
 }
