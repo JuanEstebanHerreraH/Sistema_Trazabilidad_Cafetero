@@ -110,7 +110,6 @@ export default function UsuariosPage() {
             <p className="page-subtitle">Gestión de cuentas y roles del sistema</p>
           </div>
         </div>
-        </div>
         <button onClick={() => setFiltroOpen(v => !v)}
           style={{ display:'inline-flex', alignItems:'center', gap:'0.4rem', height:38, padding:'0 1rem', borderRadius:'var(--r-md)', border: filtroOpen||filtroCount>0 ? '1px solid var(--primary)' : '1px solid var(--border)', background: filtroOpen||filtroCount>0 ? 'rgba(196,122,44,0.12)' : 'var(--bg-input)', color: filtroOpen||filtroCount>0 ? 'var(--primary)' : 'var(--text-soft)', fontSize:'0.84rem', fontFamily:'var(--font-body)', cursor:'pointer', fontWeight:600 }}>
           🎯 Filtros
@@ -159,7 +158,6 @@ export default function UsuariosPage() {
           </div>
         </div>
       )}
-      </div>
 
       {loading ? (
         <div className="loading-center"><div className="spinner" /><span>Cargando…</span></div>
