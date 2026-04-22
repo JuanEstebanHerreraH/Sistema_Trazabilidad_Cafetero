@@ -47,6 +47,7 @@ export default function Movimientos() {
   const [filtroHasta, setFiltroHasta] = useState('')
   const [cantidadMin, setCantidadMin] = useState('')
   const [cantidadMax, setCantidadMax] = useState('')
+  const [panelOpen, setPanelOpen]     = useState(false)
   const [sortKey, setSortKey]         = useState<string | null>('fecha_movimiento')
   const [sortDir, setSortDir]         = useState<'asc' | 'desc'>('desc')
   const [page, setPage]               = useState(1)
@@ -259,67 +260,23 @@ export default function Movimientos() {
       {/* ── Filter Bar ── */}
       <div className="filter-bar">
         <div className="filter-row">
-          {/* Search */}
           <div className="toolbar-search">
             <span className="search-icon">🔍</span>
             <input type="text" placeholder="Buscar por lote, almacén, notas…" value={search}
               onChange={e => { setSearch(e.target.value); resetPage() }} />
           </div>
 
-          {/* Tipo */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-            <label style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)' }}>Tipo</label>
-            <select value={filtroTipo} onChange={e => { setFiltroTipo(e.target.value); resetPage() }}
-              style={{ height: '34px', minWidth: '130px', background: filtroTipo ? 'var(--primary-subtle)' : 'var(--bg-input)', border: filtroTipo ? '1px solid var(--primary)' : '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text)', fontSize: '0.8rem', fontFamily: 'var(--font-body)', padding: '0 0.5rem', outline: 'none', cursor: 'pointer' }}>
-              <option value="">Todos</option>
-              <option value="entrada">📥 Entrada</option>
-              <option value="salida">📤 Salida</option>
-              <option value="traslado">🔄 Traslado</option>
-            </select>
-          </div>
+          <button className={`btn-filter${(filtroTipo || filtroAlmacen || filtroDesde || filtroHasta || cantidadMin || cantidadMax) ? ' active' : ''}`}
+            onClick={() => setPanelOpen(v => !v)}>
+            ⚙ Filtros
+            {[filtroTipo, filtroAlmacen, filtroDesde || filtroHasta, cantidadMin || cantidadMax].filter(Boolean).length > 0 && (
+              <span className="filter-badge">{[filtroTipo, filtroAlmacen, filtroDesde || filtroHasta, cantidadMin || cantidadMax].filter(Boolean).length}</span>
+            )}
+          </button>
 
-          {/* Almacén */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-            <label style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)' }}>Almacén</label>
-            <select value={filtroAlmacen} onChange={e => { setFiltroAlmacen(e.target.value); resetPage() }}
-              style={{ height: '34px', minWidth: '140px', background: filtroAlmacen ? 'var(--primary-subtle)' : 'var(--bg-input)', border: filtroAlmacen ? '1px solid var(--primary)' : '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text)', fontSize: '0.8rem', fontFamily: 'var(--font-body)', padding: '0 0.5rem', outline: 'none', cursor: 'pointer' }}>
-              <option value="">Todos</option>
-              {almacenes.map(a => <option key={a.idalmacen} value={a.idalmacen}>{a.nombre}</option>)}
-            </select>
-          </div>
-
-          {/* Fechas */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-            <label style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)' }}>📅 Fecha</label>
-            <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
-              <input type="date" value={filtroDesde} onChange={e => { setFiltroDesde(e.target.value); resetPage() }}
-                style={{ height: '34px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text)', fontSize: '0.78rem', fontFamily: 'var(--font-body)', padding: '0 0.4rem', outline: 'none' }} />
-              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>–</span>
-              <input type="date" value={filtroHasta} onChange={e => { setFiltroHasta(e.target.value); resetPage() }}
-                style={{ height: '34px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text)', fontSize: '0.78rem', fontFamily: 'var(--font-body)', padding: '0 0.4rem', outline: 'none' }} />
-            </div>
-          </div>
-
-          {/* Cantidad rango */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-            <label style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)' }}>Cantidad (kg)</label>
-            <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
-              <input type="number" placeholder="Mín"
-                value={cantidadMin}
-                onChange={e => { setCantidadMin(e.target.value); resetPage() }}
-                style={{ height: '34px', width: '80px', background: cantidadMin ? 'var(--primary-subtle)' : 'var(--bg-input)', border: cantidadMin ? '1px solid var(--primary)' : '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text)', fontSize: '0.78rem', fontFamily: 'var(--font-body)', padding: '0 0.4rem', outline: 'none' }} />
-              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>–</span>
-              <input type="number" placeholder="Máx"
-                value={cantidadMax}
-                onChange={e => { setCantidadMax(e.target.value); resetPage() }}
-                style={{ height: '34px', width: '80px', background: cantidadMax ? 'var(--primary-subtle)' : 'var(--bg-input)', border: cantidadMax ? '1px solid var(--primary)' : '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text)', fontSize: '0.78rem', fontFamily: 'var(--font-body)', padding: '0 0.4rem', outline: 'none' }} />
-            </div>
-          </div>
-
-          {/* Limpiar */}
           {(search || filtroTipo || filtroAlmacen || filtroDesde || filtroHasta || cantidadMin || cantidadMax) && (
             <button onClick={clearAllFilters}
-              style={{ height: '34px', padding: '0 0.7rem', background: 'transparent', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text-muted)', fontSize: '0.78rem', cursor: 'pointer', alignSelf: 'flex-end' }}>
+              style={{ height: '34px', padding: '0 0.7rem', background: 'transparent', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text-muted)', fontSize: '0.78rem', cursor: 'pointer' }}>
               ✕ Limpiar
             </button>
           )}
@@ -328,6 +285,54 @@ export default function Movimientos() {
             {filtered.length} mov.{data.length !== filtered.length && <span style={{ color: 'var(--text-dim)', fontWeight: 400 }}> / {data.length}</span>}
           </span>
         </div>
+
+        {panelOpen && (
+          <div className="filter-panel">
+            <div className="form-group" style={{ margin: 0 }}>
+              <label className="form-label" style={{ fontSize: '0.72rem' }}>Tipo</label>
+              <select className="form-select" style={{ height: '36px', fontSize: '0.82rem', background: filtroTipo ? 'var(--primary-subtle)' : undefined, border: filtroTipo ? '1px solid var(--primary)' : undefined }}
+                value={filtroTipo} onChange={e => { setFiltroTipo(e.target.value); resetPage() }}>
+                <option value="">Todos</option>
+                <option value="entrada">📥 Entrada</option>
+                <option value="salida">📤 Salida</option>
+                <option value="traslado">🔄 Traslado</option>
+              </select>
+            </div>
+
+            <div className="form-group" style={{ margin: 0 }}>
+              <label className="form-label" style={{ fontSize: '0.72rem' }}>Almacén</label>
+              <select className="form-select" style={{ height: '36px', fontSize: '0.82rem', background: filtroAlmacen ? 'var(--primary-subtle)' : undefined, border: filtroAlmacen ? '1px solid var(--primary)' : undefined }}
+                value={filtroAlmacen} onChange={e => { setFiltroAlmacen(e.target.value); resetPage() }}>
+                <option value="">Todos</option>
+                {almacenes.map(a => <option key={a.idalmacen} value={a.idalmacen}>{a.nombre}</option>)}
+              </select>
+            </div>
+
+            <div className="form-group" style={{ margin: 0, minWidth: 200 }}>
+              <label className="form-label" style={{ fontSize: '0.72rem' }}>Cantidad (kg)</label>
+              <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
+                <input type="number" className="form-input" placeholder="Mín"
+                  style={{ height: '36px', fontSize: '0.82rem', flex: 1, background: cantidadMin ? 'var(--primary-subtle)' : undefined, border: cantidadMin ? '1px solid var(--primary)' : undefined }}
+                  value={cantidadMin} onChange={e => { setCantidadMin(e.target.value); resetPage() }} />
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>–</span>
+                <input type="number" className="form-input" placeholder="Máx"
+                  style={{ height: '36px', fontSize: '0.82rem', flex: 1, background: cantidadMax ? 'var(--primary-subtle)' : undefined, border: cantidadMax ? '1px solid var(--primary)' : undefined }}
+                  value={cantidadMax} onChange={e => { setCantidadMax(e.target.value); resetPage() }} />
+              </div>
+            </div>
+
+            <div className="form-group" style={{ margin: 0, minWidth: 200 }}>
+              <label className="form-label" style={{ fontSize: '0.72rem' }}>📅 Fecha</label>
+              <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
+                <input type="date" className="form-input" style={{ height: '36px', fontSize: '0.82rem', flex: 1 }}
+                  value={filtroDesde} onChange={e => { setFiltroDesde(e.target.value); resetPage() }} />
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>–</span>
+                <input type="date" className="form-input" style={{ height: '36px', fontSize: '0.82rem', flex: 1 }}
+                  value={filtroHasta} onChange={e => { setFiltroHasta(e.target.value); resetPage() }} />
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ── Table ── */}

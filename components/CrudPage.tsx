@@ -289,8 +289,8 @@ export default function CrudPage({
       {/* ── FILTER BAR ── */}
       {hasAnyFilter && (
         <div className="filter-bar">
+          {/* Top row: search + toggle button */}
           <div className="filter-row">
-            {/* Search – usa las mismas clases CSS que el resto del sistema */}
             {hasAnySearch && (
               <div className="toolbar-search">
                 <span className="search-icon">🔍</span>
@@ -303,93 +303,100 @@ export default function CrudPage({
               </div>
             )}
 
-            {/* Select filters */}
-            {filterSelects && filterSelects.length > 0 && filterSelects.map(fs => (
-              <div key={fs.key} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                <label style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)' }}>
-                  {fs.label}
-                </label>
-                <select
-                  value={filterValues[fs.key] ?? ''}
-                  onChange={e => { setFilterValues(p => ({ ...p, [fs.key]: e.target.value })); resetPage() }}
-                  style={{
-                    height: '34px', minWidth: '130px',
-                    background: filterValues[fs.key] ? 'var(--primary-subtle)' : 'var(--bg-input)',
-                    border: filterValues[fs.key] ? '1px solid var(--primary)' : '1px solid var(--border)',
-                    borderRadius: 'var(--r-md)', color: 'var(--text)',
-                    fontSize: '0.8rem', fontFamily: 'var(--font-body)',
-                    padding: '0 0.5rem', outline: 'none', cursor: 'pointer',
-                  }}
-                >
-                  <option value="">Todos</option>
-                  {fs.options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                </select>
-              </div>
-            ))}
+            {(hasSelects || hasDates || hasRanges) && (
+              <button
+                className={`btn-filter${panelOpen ? ' active' : ''}`}
+                onClick={() => setPanelOpen(v => !v)}
+              >
+                ⚙ Filtros
+                {activeFilterCount > 0 && (
+                  <span className="filter-badge">{activeFilterCount}</span>
+                )}
+              </button>
+            )}
 
-            {/* Date filters */}
-            {dateFilters && dateFilters.length > 0 && dateFilters.map(df => (
-              <div key={df.key} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                <label style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)' }}>
-                  📅 {df.label}
-                </label>
-                <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
-                  <input type="date" value={dateFrom[df.key] ?? ''}
-                    onChange={e => { setDateFrom(p => ({ ...p, [df.key]: e.target.value })); resetPage() }}
-                    style={{ height: '34px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text)', fontSize: '0.78rem', fontFamily: 'var(--font-body)', padding: '0 0.4rem', outline: 'none' }}
-                  />
-                  <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>–</span>
-                  <input type="date" value={dateTo[df.key] ?? ''}
-                    onChange={e => { setDateTo(p => ({ ...p, [df.key]: e.target.value })); resetPage() }}
-                    style={{ height: '34px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text)', fontSize: '0.78rem', fontFamily: 'var(--font-body)', padding: '0 0.4rem', outline: 'none' }}
-                  />
-                </div>
-              </div>
-            ))}
-
-            {/* Range filters */}
-            {rangeFilters && rangeFilters.length > 0 && rangeFilters.map(rf => {
-              const active = !!(rangeMin[rf.key] || rangeMax[rf.key])
-              return (
-                <div key={rf.key} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                  <label style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)' }}>
-                    {rf.label}{rf.unit ? ` (${rf.unit})` : ''}
-                  </label>
-                  <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
-                    <input
-                      type="number" placeholder="Mín"
-                      value={rangeMin[rf.key] ?? ''}
-                      onChange={e => { setRangeMin(p => ({ ...p, [rf.key]: e.target.value })); resetPage() }}
-                      style={{ height: '34px', width: '80px', background: active ? 'var(--primary-subtle)' : 'var(--bg-input)', border: active ? '1px solid var(--primary)' : '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text)', fontSize: '0.78rem', fontFamily: 'var(--font-body)', padding: '0 0.4rem', outline: 'none' }}
-                    />
-                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>–</span>
-                    <input
-                      type="number" placeholder="Máx"
-                      value={rangeMax[rf.key] ?? ''}
-                      onChange={e => { setRangeMax(p => ({ ...p, [rf.key]: e.target.value })); resetPage() }}
-                      style={{ height: '34px', width: '80px', background: active ? 'var(--primary-subtle)' : 'var(--bg-input)', border: active ? '1px solid var(--primary)' : '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text)', fontSize: '0.78rem', fontFamily: 'var(--font-body)', padding: '0 0.4rem', outline: 'none' }}
-                    />
-                  </div>
-                </div>
-              )
-            })}
-
-            {/* Limpiar */}
             {(hasFilters || search) && (
               <button
-                onClick={() => { clearAll(); setSearch(''); resetPage() }}
-                style={{ height: '34px', padding: '0 0.7rem', background: 'transparent', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text-muted)', fontSize: '0.78rem', cursor: 'pointer', whiteSpace: 'nowrap', alignSelf: 'flex-end' }}
+                onClick={() => { clearAll(); resetPage() }}
+                style={{ height: '34px', padding: '0 0.7rem', background: 'transparent', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text-muted)', fontSize: '0.78rem', cursor: 'pointer', whiteSpace: 'nowrap' }}
               >
                 ✕ Limpiar
               </button>
             )}
 
-            {/* Conteo */}
             <span className="toolbar-count">
               {filtered.length} registro{filtered.length !== 1 ? 's' : ''}
               {data.length !== filtered.length && <span style={{ color: 'var(--text-dim)', fontWeight: 400 }}> / {data.length}</span>}
             </span>
           </div>
+
+          {/* Expandable filter panel */}
+          {panelOpen && (
+            <div className="filter-panel">
+              {/* Select filters */}
+              {filterSelects && filterSelects.map(fs => (
+                <div key={fs.key} className="form-group" style={{ margin: 0 }}>
+                  <label className="form-label" style={{ fontSize: '0.72rem' }}>{fs.label}</label>
+                  <select
+                    className="form-select"
+                    style={{
+                      height: '36px', fontSize: '0.82rem',
+                      background: filterValues[fs.key] ? 'var(--primary-subtle)' : undefined,
+                      border: filterValues[fs.key] ? '1px solid var(--primary)' : undefined,
+                    }}
+                    value={filterValues[fs.key] ?? ''}
+                    onChange={e => { setFilterValues(p => ({ ...p, [fs.key]: e.target.value })); resetPage() }}
+                  >
+                    <option value="">Todos</option>
+                    {fs.options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                </div>
+              ))}
+
+              {/* Date filters */}
+              {dateFilters && dateFilters.map(df => (
+                <div key={df.key} className="form-group" style={{ margin: 0, minWidth: 200 }}>
+                  <label className="form-label" style={{ fontSize: '0.72rem' }}>📅 {df.label}</label>
+                  <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
+                    <input type="date" className="form-input"
+                      style={{ height: '36px', fontSize: '0.82rem', flex: 1 }}
+                      value={dateFrom[df.key] ?? ''}
+                      onChange={e => { setDateFrom(p => ({ ...p, [df.key]: e.target.value })); resetPage() }}
+                    />
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>–</span>
+                    <input type="date" className="form-input"
+                      style={{ height: '36px', fontSize: '0.82rem', flex: 1 }}
+                      value={dateTo[df.key] ?? ''}
+                      onChange={e => { setDateTo(p => ({ ...p, [df.key]: e.target.value })); resetPage() }}
+                    />
+                  </div>
+                </div>
+              ))}
+
+              {/* Range filters */}
+              {rangeFilters && rangeFilters.map(rf => {
+                const active = !!(rangeMin[rf.key] || rangeMax[rf.key])
+                return (
+                  <div key={rf.key} className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label" style={{ fontSize: '0.72rem' }}>{rf.label}{rf.unit ? ` (${rf.unit})` : ''}</label>
+                    <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
+                      <input type="number" className="form-input" placeholder="Mín"
+                        style={{ height: '36px', fontSize: '0.82rem', flex: 1, background: active ? 'var(--primary-subtle)' : undefined, border: active ? '1px solid var(--primary)' : undefined }}
+                        value={rangeMin[rf.key] ?? ''}
+                        onChange={e => { setRangeMin(p => ({ ...p, [rf.key]: e.target.value })); resetPage() }}
+                      />
+                      <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>–</span>
+                      <input type="number" className="form-input" placeholder="Máx"
+                        style={{ height: '36px', fontSize: '0.82rem', flex: 1, background: active ? 'var(--primary-subtle)' : undefined, border: active ? '1px solid var(--primary)' : undefined }}
+                        value={rangeMax[rf.key] ?? ''}
+                        onChange={e => { setRangeMax(p => ({ ...p, [rf.key]: e.target.value })); resetPage() }}
+                      />
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </div>
       )}
 

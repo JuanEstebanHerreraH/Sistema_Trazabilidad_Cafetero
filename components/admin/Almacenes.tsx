@@ -27,6 +27,7 @@ export default function Almacenes() {
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const PAGE_SIZE_A = 12
+  const [panelOpen, setPanelOpen] = useState(false)
 
   // Modal crear/editar
   const [modalOpen, setModalOpen] = useState(false)
@@ -215,45 +216,61 @@ export default function Almacenes() {
             <span className="search-icon">🔍</span>
             <input type="text" placeholder="Buscar almacén o ubicación…" value={search} onChange={e => { setSearch(e.target.value); setPage(1) }} />
           </div>
-          <div className="filter-segments">
-            {([
-              { v: '',           lbl: 'Todos' },
-              { v: 'disponible', lbl: '🟢 Con espacio' },
-              { v: 'casi_lleno', lbl: '🟡 Casi lleno' },
-              { v: 'lleno',      lbl: '🔴 Lleno' },
-              { v: 'sin_limite', lbl: '∞ Sin límite' },
-            ] as const).map(o => (
-              <button key={o.v} className={`filter-seg${filtroEstado === o.v ? ' active' : ''}`}
-                onClick={() => { setFiltroEstado(o.v); setPage(1) }}>{o.lbl}</button>
-            ))}
-          </div>
 
-          {/* Rango capacidad */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-            <label style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)' }}>Capacidad (kg)</label>
-            <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
-              <input type="number" placeholder="Mín"
-                value={capacidadMin}
-                onChange={e => { setCapacidadMin(e.target.value); setPage(1) }}
-                style={{ height: '34px', width: '82px', background: capacidadMin ? 'var(--primary-subtle)' : 'var(--bg-input)', border: capacidadMin ? '1px solid var(--primary)' : '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text)', fontSize: '0.78rem', fontFamily: 'var(--font-body)', padding: '0 0.4rem', outline: 'none' }} />
-              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>–</span>
-              <input type="number" placeholder="Máx"
-                value={capacidadMax}
-                onChange={e => { setCapacidadMax(e.target.value); setPage(1) }}
-                style={{ height: '34px', width: '82px', background: capacidadMax ? 'var(--primary-subtle)' : 'var(--bg-input)', border: capacidadMax ? '1px solid var(--primary)' : '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text)', fontSize: '0.78rem', fontFamily: 'var(--font-body)', padding: '0 0.4rem', outline: 'none' }} />
-            </div>
-          </div>
+          <button className={`btn-filter${(filtroEstado || capacidadMin || capacidadMax) ? ' active' : ''}`}
+            onClick={() => setPanelOpen(v => !v)}>
+            ⚙ Filtros
+            {[filtroEstado, capacidadMin || capacidadMax].filter(Boolean).length > 0 && (
+              <span className="filter-badge">{[filtroEstado, capacidadMin || capacidadMax].filter(Boolean).length}</span>
+            )}
+          </button>
 
           {hasActiveFilter && (
             <button onClick={clearAllFilters}
-              style={{ height: '34px', padding: '0 0.7rem', background: 'transparent', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text-muted)', fontSize: '0.78rem', cursor: 'pointer', alignSelf: 'flex-end', whiteSpace: 'nowrap' }}>
+              style={{ height: '34px', padding: '0 0.7rem', background: 'transparent', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text-muted)', fontSize: '0.78rem', cursor: 'pointer' }}>
               ✕ Limpiar
             </button>
           )}
+
           <span className="toolbar-count" style={{ marginLeft: 'auto' }}>
             {filtered.length}{filtered.length !== almacenes.length && <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}> de {almacenes.length}</span>} almacenes
           </span>
         </div>
+
+        {panelOpen && (
+          <div className="filter-panel">
+            {/* Ocupación */}
+            <div className="form-group" style={{ margin: 0, gridColumn: 'span 2' }}>
+              <label className="form-label" style={{ fontSize: '0.72rem' }}>Estado de ocupación</label>
+              <div className="filter-segments" style={{ flexWrap: 'wrap' }}>
+                {([
+                  { v: '',           lbl: 'Todos' },
+                  { v: 'disponible', lbl: '🟢 Con espacio' },
+                  { v: 'casi_lleno', lbl: '🟡 Casi lleno' },
+                  { v: 'lleno',      lbl: '🔴 Lleno' },
+                  { v: 'sin_limite', lbl: '∞ Sin límite' },
+                ] as const).map(o => (
+                  <button key={o.v} className={`filter-seg${filtroEstado === o.v ? ' active' : ''}`}
+                    onClick={() => { setFiltroEstado(o.v); setPage(1) }}>{o.lbl}</button>
+                ))}
+              </div>
+            </div>
+
+            {/* Capacidad min */}
+            <div className="form-group" style={{ margin: 0, minWidth: 200 }}>
+              <label className="form-label" style={{ fontSize: '0.72rem' }}>Capacidad (kg)</label>
+              <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
+                <input type="number" className="form-input" placeholder="Mín"
+                  style={{ height: '36px', fontSize: '0.82rem', flex: 1, background: capacidadMin ? 'var(--primary-subtle)' : undefined, border: capacidadMin ? '1px solid var(--primary)' : undefined }}
+                  value={capacidadMin} onChange={e => { setCapacidadMin(e.target.value); setPage(1) }} />
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>–</span>
+                <input type="number" className="form-input" placeholder="Máx"
+                  style={{ height: '36px', fontSize: '0.82rem', flex: 1, background: capacidadMax ? 'var(--primary-subtle)' : undefined, border: capacidadMax ? '1px solid var(--primary)' : undefined }}
+                  value={capacidadMax} onChange={e => { setCapacidadMax(e.target.value); setPage(1) }} />
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Cards grid */}

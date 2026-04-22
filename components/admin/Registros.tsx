@@ -53,6 +53,7 @@ export default function Registros() {
   const [filtroCal,     setFiltroCal]     = useState('') // 'alta' | 'media' | 'baja' | 'sin'
   const [sortDir,       setSortDir]       = useState<'asc' | 'desc'>('desc')
   const [page,          setPage]          = useState(1)
+  const [panelOpen,     setPanelOpen]     = useState(false)
 
   // ── Modal form ───────────────────────────────────────────────
   const [modalOpen,   setModalOpen]   = useState(false)
@@ -200,66 +201,80 @@ export default function Registros() {
               onChange={e => { setSearch(e.target.value); resetPage() }} />
           </div>
 
-          {/* Proceso */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-            <label style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)' }}>Proceso</label>
-            <select value={filtroProceso} onChange={e => { setFiltroProceso(e.target.value); resetPage() }}
-              style={{ height: '34px', minWidth: '130px', background: filtroProceso ? 'var(--primary-subtle)' : 'var(--bg-input)', border: filtroProceso ? '1px solid var(--primary)' : '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text)', fontSize: '0.8rem', fontFamily: 'var(--font-body)', padding: '0 0.5rem', outline: 'none', cursor: 'pointer' }}>
-              <option value="">Todos</option>
-              {procesos.map(p => <option key={p.idproceso} value={p.idproceso}>{p.nombre}</option>)}
-            </select>
-          </div>
-
-          {/* Responsable */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-            <label style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)' }}>Responsable</label>
-            <select value={filtroUsuario} onChange={e => { setFiltroUsuario(e.target.value); resetPage() }}
-              style={{ height: '34px', minWidth: '140px', background: filtroUsuario ? 'var(--primary-subtle)' : 'var(--bg-input)', border: filtroUsuario ? '1px solid var(--primary)' : '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text)', fontSize: '0.8rem', fontFamily: 'var(--font-body)', padding: '0 0.5rem', outline: 'none', cursor: 'pointer' }}>
-              <option value="">Todos</option>
-              {usuarios.map(u => <option key={u.idusuario} value={u.idusuario}>{u.nombre}</option>)}
-            </select>
-          </div>
-
-          {/* Calificación */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-            <label style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)' }}>Calificación</label>
-            <select value={filtroCal} onChange={e => { setFiltroCal(e.target.value); resetPage() }}
-              style={{ height: '34px', minWidth: '130px', background: filtroCal ? 'var(--primary-subtle)' : 'var(--bg-input)', border: filtroCal ? '1px solid var(--primary)' : '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text)', fontSize: '0.8rem', fontFamily: 'var(--font-body)', padding: '0 0.5rem', outline: 'none', cursor: 'pointer' }}>
-              <option value="">Todas</option>
-              <option value="alta">🟢 Alta (≥ 8.5)</option>
-              <option value="media">🟡 Media (6–8.4)</option>
-              <option value="baja">🔴 Baja (&lt; 6)</option>
-              <option value="sin">⏳ Sin calificar</option>
-            </select>
-          </div>
-
-          {/* Fechas */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-            <label style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)' }}>📅 Fecha inicio</label>
-            <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
-              <input type="date" value={filtroDesde} onChange={e => { setFiltroDesde(e.target.value); resetPage() }}
-                style={{ height: '34px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text)', fontSize: '0.78rem', fontFamily: 'var(--font-body)', padding: '0 0.4rem', outline: 'none' }} />
-              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>–</span>
-              <input type="date" value={filtroHasta} onChange={e => { setFiltroHasta(e.target.value); resetPage() }}
-                style={{ height: '34px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text)', fontSize: '0.78rem', fontFamily: 'var(--font-body)', padding: '0 0.4rem', outline: 'none' }} />
-            </div>
-          </div>
-
-          {/* Orden + Limpiar */}
-          <button onClick={() => setSortDir(d => d === 'asc' ? 'desc' : 'asc')}
-            style={{ height: '34px', padding: '0 0.65rem', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text-soft)', fontSize: '0.78rem', cursor: 'pointer', alignSelf: 'flex-end' }}>
-            {sortDir === 'desc' ? '↓ Reciente' : '↑ Antiguo'}
+          <button
+            className={`btn-filter${(filtroProceso || filtroUsuario || filtroDesde || filtroHasta || filtroCal) ? ' active' : ''}`}
+            onClick={() => setPanelOpen(v => !v)}
+          >
+            ⚙ Filtros
+            {[filtroProceso, filtroUsuario, filtroDesde || filtroHasta, filtroCal].filter(Boolean).length > 0 && (
+              <span className="filter-badge">
+                {[filtroProceso, filtroUsuario, filtroDesde || filtroHasta, filtroCal].filter(Boolean).length}
+              </span>
+            )}
           </button>
+
           {hasActiveFilter && (
             <button onClick={clearAll}
-              style={{ height: '34px', padding: '0 0.7rem', background: 'transparent', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text-muted)', fontSize: '0.78rem', cursor: 'pointer', alignSelf: 'flex-end' }}>
+              style={{ height: '34px', padding: '0 0.7rem', background: 'transparent', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text-muted)', fontSize: '0.78rem', cursor: 'pointer' }}>
               ✕ Limpiar
             </button>
           )}
+
+          <button onClick={() => setSortDir(d => d === 'asc' ? 'desc' : 'asc')}
+            style={{ height: '34px', padding: '0 0.65rem', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text-soft)', fontSize: '0.78rem', cursor: 'pointer' }}>
+            {sortDir === 'desc' ? '↓ Reciente' : '↑ Antiguo'}
+          </button>
+
           <span className="toolbar-count">
             {filtered.length}<span style={{ color: 'var(--text-dim)', fontWeight: 400 }}>/{rows.length}</span>
           </span>
         </div>
+
+        {/* Expandable filter panel */}
+        {panelOpen && (
+          <div className="filter-panel">
+            <div className="form-group" style={{ margin: 0 }}>
+              <label className="form-label" style={{ fontSize: '0.72rem' }}>Proceso</label>
+              <select className="form-select" style={{ height: '36px', fontSize: '0.82rem', background: filtroProceso ? 'var(--primary-subtle)' : undefined, border: filtroProceso ? '1px solid var(--primary)' : undefined }}
+                value={filtroProceso} onChange={e => { setFiltroProceso(e.target.value); resetPage() }}>
+                <option value="">Todos</option>
+                {procesos.map(p => <option key={p.idproceso} value={p.idproceso}>{p.nombre}</option>)}
+              </select>
+            </div>
+
+            <div className="form-group" style={{ margin: 0 }}>
+              <label className="form-label" style={{ fontSize: '0.72rem' }}>Responsable</label>
+              <select className="form-select" style={{ height: '36px', fontSize: '0.82rem', background: filtroUsuario ? 'var(--primary-subtle)' : undefined, border: filtroUsuario ? '1px solid var(--primary)' : undefined }}
+                value={filtroUsuario} onChange={e => { setFiltroUsuario(e.target.value); resetPage() }}>
+                <option value="">Todos</option>
+                {usuarios.map(u => <option key={u.idusuario} value={u.idusuario}>{u.nombre}</option>)}
+              </select>
+            </div>
+
+            <div className="form-group" style={{ margin: 0 }}>
+              <label className="form-label" style={{ fontSize: '0.72rem' }}>Calificación</label>
+              <select className="form-select" style={{ height: '36px', fontSize: '0.82rem', background: filtroCal ? 'var(--primary-subtle)' : undefined, border: filtroCal ? '1px solid var(--primary)' : undefined }}
+                value={filtroCal} onChange={e => { setFiltroCal(e.target.value); resetPage() }}>
+                <option value="">Todas</option>
+                <option value="alta">🟢 Alta (≥ 8.5)</option>
+                <option value="media">🟡 Media (6–8.4)</option>
+                <option value="baja">🔴 Baja (&lt; 6)</option>
+                <option value="sin">⏳ Sin calificar</option>
+              </select>
+            </div>
+
+            <div className="form-group" style={{ margin: 0, minWidth: 200 }}>
+              <label className="form-label" style={{ fontSize: '0.72rem' }}>📅 Fecha inicio</label>
+              <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
+                <input type="date" className="form-input" style={{ height: '36px', fontSize: '0.82rem', flex: 1 }}
+                  value={filtroDesde} onChange={e => { setFiltroDesde(e.target.value); resetPage() }} />
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>–</span>
+                <input type="date" className="form-input" style={{ height: '36px', fontSize: '0.82rem', flex: 1 }}
+                  value={filtroHasta} onChange={e => { setFiltroHasta(e.target.value); resetPage() }} />
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Table */}
