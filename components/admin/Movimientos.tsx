@@ -45,9 +45,6 @@ export default function Movimientos() {
   const [filtroAlmacen, setFiltroAlmacen] = useState('')
   const [filtroDesde, setFiltroDesde] = useState('')
   const [filtroHasta, setFiltroHasta] = useState('')
-  const [cantidadMin, setCantidadMin] = useState('')
-  const [cantidadMax, setCantidadMax] = useState('')
-  const [panelOpen, setPanelOpen]     = useState(false)
   const [sortKey, setSortKey]         = useState<string | null>('fecha_movimiento')
   const [sortDir, setSortDir]         = useState<'asc' | 'desc'>('desc')
   const [page, setPage]               = useState(1)
@@ -110,7 +107,7 @@ export default function Movimientos() {
   // ── Computed filters ────────────────────────────────
   const clearAllFilters = () => {
     setSearch(''); setFiltroTipo(''); setFiltroAlmacen('')
-    setFiltroDesde(''); setFiltroHasta(''); setCantidadMin(''); setCantidadMax(''); setPage(1)
+    setFiltroDesde(''); setFiltroHasta(''); setPage(1)
   }
 
   const filtered = useMemo(() => {
@@ -132,8 +129,6 @@ export default function Movimientos() {
     }
     if (filtroDesde) r = r.filter(row => row.fecha_movimiento && new Date(row.fecha_movimiento) >= new Date(filtroDesde))
     if (filtroHasta) r = r.filter(row => row.fecha_movimiento && new Date(row.fecha_movimiento) <= new Date(filtroHasta + 'T23:59:59'))
-    if (cantidadMin) r = r.filter(row => Number(row.cantidad ?? 0) >= Number(cantidadMin))
-    if (cantidadMax) r = r.filter(row => Number(row.cantidad ?? 0) <= Number(cantidadMax))
     if (sortKey) {
       r = [...r].sort((a, b) => {
         const av = a[sortKey] ?? ''
@@ -143,7 +138,7 @@ export default function Movimientos() {
       })
     }
     return r
-  }, [data, search, filtroTipo, filtroAlmacen, filtroDesde, filtroHasta, cantidadMin, cantidadMax, sortKey, sortDir])
+  }, [data, search, filtroTipo, filtroAlmacen, filtroDesde, filtroHasta, sortKey, sortDir])
 
   const pageCount = Math.ceil(filtered.length / PAGE_SIZE)
   const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
@@ -258,94 +253,61 @@ export default function Movimientos() {
       {error && <div className="alert alert-error" style={{ marginBottom: '1rem' }}>⚠ {error}</div>}
 
       {/* ── Filter Bar ── */}
-      <div style={{ marginBottom: '1rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+      <div className="filter-bar">
+        <div className="filter-row">
           {/* Search */}
-          <div style={{ position: 'relative', flex: 1, minWidth: '180px', maxWidth: '360px' }}>
-            <span style={{ position: 'absolute', left: '0.7rem', top: '50%', transform: 'translateY(-50%)', opacity: 0.5, fontSize: '0.85rem', pointerEvents: 'none' }}>🔍</span>
+          <div className="toolbar-search">
+            <span className="search-icon">🔍</span>
             <input type="text" placeholder="Buscar por lote, almacén, notas…" value={search}
-              onChange={e => { setSearch(e.target.value); resetPage() }}
-              style={{ width: '100%', height: '36px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', padding: '0 0.9rem 0 2.2rem', color: 'var(--text)', fontSize: '0.84rem', fontFamily: 'var(--font-body)', outline: 'none' }} />
+              onChange={e => { setSearch(e.target.value); resetPage() }} />
           </div>
 
-          {/* Filter toggle */}
-          {(() => {
-            const numActive = [filtroTipo, filtroAlmacen, filtroDesde || filtroHasta, cantidadMin || cantidadMax].filter(Boolean).length
-            const isActive = panelOpen || numActive > 0
-            return (
-              <button onClick={() => setPanelOpen(v => !v)}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', height: '36px', padding: '0 0.9rem', borderRadius: 'var(--r-md)', border: isActive ? '1px solid var(--primary)' : '1px solid var(--border)', background: isActive ? 'rgba(196,122,44,0.12)' : 'var(--bg-input)', color: isActive ? 'var(--primary)' : 'var(--text-soft)', fontSize: '0.82rem', fontFamily: 'var(--font-body)', cursor: 'pointer', fontWeight: numActive > 0 ? 600 : 400 }}>
-                🎯 Filtros
-                {numActive > 0 && (
-                  <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '18px', height: '18px', borderRadius: '99px', background: 'var(--primary)', color: '#fff', fontSize: '0.65rem', fontWeight: 700 }}>{numActive}</span>
-                )}
-                <span style={{ fontSize: '0.7rem', opacity: 0.6 }}>{panelOpen ? '▲' : '▼'}</span>
-              </button>
-            )
-          })()}
+          {/* Tipo */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            <label style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)' }}>Tipo</label>
+            <select value={filtroTipo} onChange={e => { setFiltroTipo(e.target.value); resetPage() }}
+              style={{ height: '34px', minWidth: '130px', background: filtroTipo ? 'var(--primary-subtle)' : 'var(--bg-input)', border: filtroTipo ? '1px solid var(--primary)' : '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text)', fontSize: '0.8rem', fontFamily: 'var(--font-body)', padding: '0 0.5rem', outline: 'none', cursor: 'pointer' }}>
+              <option value="">Todos</option>
+              <option value="entrada">📥 Entrada</option>
+              <option value="salida">📤 Salida</option>
+              <option value="traslado">🔄 Traslado</option>
+            </select>
+          </div>
 
-          {(search || filtroTipo || filtroAlmacen || filtroDesde || filtroHasta || cantidadMin || cantidadMax) && (
+          {/* Almacén */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            <label style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)' }}>Almacén</label>
+            <select value={filtroAlmacen} onChange={e => { setFiltroAlmacen(e.target.value); resetPage() }}
+              style={{ height: '34px', minWidth: '140px', background: filtroAlmacen ? 'var(--primary-subtle)' : 'var(--bg-input)', border: filtroAlmacen ? '1px solid var(--primary)' : '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text)', fontSize: '0.8rem', fontFamily: 'var(--font-body)', padding: '0 0.5rem', outline: 'none', cursor: 'pointer' }}>
+              <option value="">Todos</option>
+              {almacenes.map(a => <option key={a.idalmacen} value={a.idalmacen}>{a.nombre}</option>)}
+            </select>
+          </div>
+
+          {/* Fechas */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            <label style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)' }}>📅 Fecha</label>
+            <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
+              <input type="date" value={filtroDesde} onChange={e => { setFiltroDesde(e.target.value); resetPage() }}
+                style={{ height: '34px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text)', fontSize: '0.78rem', fontFamily: 'var(--font-body)', padding: '0 0.4rem', outline: 'none' }} />
+              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>–</span>
+              <input type="date" value={filtroHasta} onChange={e => { setFiltroHasta(e.target.value); resetPage() }}
+                style={{ height: '34px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text)', fontSize: '0.78rem', fontFamily: 'var(--font-body)', padding: '0 0.4rem', outline: 'none' }} />
+            </div>
+          </div>
+
+          {/* Limpiar */}
+          {(search || filtroTipo || filtroAlmacen || filtroDesde || filtroHasta) && (
             <button onClick={clearAllFilters}
-              style={{ height: '36px', padding: '0 0.8rem', background: 'transparent', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text-muted)', fontSize: '0.8rem', fontFamily: 'var(--font-body)', cursor: 'pointer' }}>
+              style={{ height: '34px', padding: '0 0.7rem', background: 'transparent', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text-muted)', fontSize: '0.78rem', cursor: 'pointer', alignSelf: 'flex-end' }}>
               ✕ Limpiar
             </button>
           )}
 
-          <span style={{ fontSize: '0.78rem', color: 'var(--text-dim)', fontWeight: 500, marginLeft: 'auto' }}>
-            {filtered.length} mov.{data.length !== filtered.length && <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}> / {data.length}</span>}
+          <span className="toolbar-count">
+            {filtered.length} mov.{data.length !== filtered.length && <span style={{ color: 'var(--text-dim)', fontWeight: 400 }}> / {data.length}</span>}
           </span>
         </div>
-
-        {/* Filter panel */}
-        {panelOpen && (
-          <div style={{ marginTop: '0.5rem', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--r-lg)', padding: '1rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: '0.75rem', alignItems: 'end' }}>
-            {/* Tipo */}
-            <div>
-              <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', marginBottom: '0.3rem' }}>Tipo</label>
-              <select value={filtroTipo} onChange={e => { setFiltroTipo(e.target.value); resetPage() }}
-                style={{ width: '100%', height: '36px', background: filtroTipo ? 'rgba(196,122,44,0.08)' : 'var(--bg-input)', border: filtroTipo ? '1px solid var(--primary)' : '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text)', fontSize: '0.82rem', fontFamily: 'var(--font-body)', padding: '0 0.5rem', outline: 'none', cursor: 'pointer' }}>
-                <option value="">— Todos —</option>
-                <option value="entrada">📥 Entrada</option>
-                <option value="salida">📤 Salida</option>
-                <option value="traslado">🔄 Traslado</option>
-              </select>
-            </div>
-
-            {/* Almacén */}
-            <div>
-              <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', marginBottom: '0.3rem' }}>Almacén</label>
-              <select value={filtroAlmacen} onChange={e => { setFiltroAlmacen(e.target.value); resetPage() }}
-                style={{ width: '100%', height: '36px', background: filtroAlmacen ? 'rgba(196,122,44,0.08)' : 'var(--bg-input)', border: filtroAlmacen ? '1px solid var(--primary)' : '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text)', fontSize: '0.82rem', fontFamily: 'var(--font-body)', padding: '0 0.5rem', outline: 'none', cursor: 'pointer' }}>
-                <option value="">— Todos —</option>
-                {almacenes.map(a => <option key={a.idalmacen} value={a.idalmacen}>{a.nombre}</option>)}
-              </select>
-            </div>
-
-            {/* Cantidad rango */}
-            <div>
-              <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', marginBottom: '0.3rem' }}>Cantidad (kg)</label>
-              <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
-                <input type="number" placeholder="Mín" value={cantidadMin} onChange={e => { setCantidadMin(e.target.value); resetPage() }}
-                  style={{ flex: 1, height: '36px', background: (cantidadMin||cantidadMax) ? 'rgba(196,122,44,0.08)' : 'var(--bg-input)', border: (cantidadMin||cantidadMax) ? '1px solid var(--primary)' : '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text)', fontSize: '0.78rem', fontFamily: 'var(--font-body)', padding: '0 0.4rem', outline: 'none' }} />
-                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', flexShrink: 0 }}>–</span>
-                <input type="number" placeholder="Máx" value={cantidadMax} onChange={e => { setCantidadMax(e.target.value); resetPage() }}
-                  style={{ flex: 1, height: '36px', background: (cantidadMin||cantidadMax) ? 'rgba(196,122,44,0.08)' : 'var(--bg-input)', border: (cantidadMin||cantidadMax) ? '1px solid var(--primary)' : '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text)', fontSize: '0.78rem', fontFamily: 'var(--font-body)', padding: '0 0.4rem', outline: 'none' }} />
-              </div>
-            </div>
-
-            {/* Fechas */}
-            <div>
-              <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', marginBottom: '0.3rem' }}>📅 Fecha</label>
-              <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
-                <input type="date" value={filtroDesde} onChange={e => { setFiltroDesde(e.target.value); resetPage() }}
-                  style={{ flex: 1, height: '36px', background: (filtroDesde||filtroHasta) ? 'rgba(196,122,44,0.08)' : 'var(--bg-input)', border: (filtroDesde||filtroHasta) ? '1px solid var(--primary)' : '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text)', fontSize: '0.78rem', fontFamily: 'var(--font-body)', padding: '0 0.4rem', outline: 'none' }} />
-                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', flexShrink: 0 }}>–</span>
-                <input type="date" value={filtroHasta} onChange={e => { setFiltroHasta(e.target.value); resetPage() }}
-                  style={{ flex: 1, height: '36px', background: (filtroDesde||filtroHasta) ? 'rgba(196,122,44,0.08)' : 'var(--bg-input)', border: (filtroDesde||filtroHasta) ? '1px solid var(--primary)' : '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text)', fontSize: '0.78rem', fontFamily: 'var(--font-body)', padding: '0 0.4rem', outline: 'none' }} />
-              </div>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* ── Table ── */}

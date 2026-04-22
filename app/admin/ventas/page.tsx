@@ -31,6 +31,12 @@ export default function VentasPage() {
   const [viewVenta, setViewVenta] = useState<Venta | null>(null)
   const [newModal, setNewModal] = useState(false)
   const [search, setSearch] = useState('')
+  const [filtroCliente, setFiltroCliente] = useState('')
+  const [fechaDesde, setFechaDesde] = useState('')
+  const [fechaHasta, setFechaHasta] = useState('')
+  const [totalMin, setTotalMin] = useState('')
+  const [totalMax, setTotalMax] = useState('')
+  const [filtroOpen, setFiltroOpen] = useState(false)
   const [form, setForm] = useState({ idcliente: '', notas: '', items: [{ idlote_cafe: '', cantidad: '', precio_venta: '' }] })
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
@@ -38,9 +44,22 @@ export default function VentasPage() {
   const [deleting, setDeleting] = useState(false)
   const supabase = createClient()
 
-  const filtered = search
-    ? data.filter((v: Venta) => v.cliente?.nombre?.toLowerCase().includes(search.toLowerCase()) || String(v.idventa).includes(search))
-    : data
+  const clienteOpts = Array.from(new Map((data as Venta[]).filter(v => v.cliente).map(v => [v.cliente!.nombre, v.cliente!.nombre])).values())
+
+  const filtroCount = [filtroCliente, fechaDesde||fechaHasta, totalMin||totalMax].filter(Boolean).length
+
+  const filtered = (data as Venta[]).filter(v => {
+    if (search && !v.cliente?.nombre?.toLowerCase().includes(search.toLowerCase()) && !String(v.idventa).includes(search)) return false
+    if (filtroCliente && v.cliente?.nombre !== filtroCliente) return false
+    if (fechaDesde && (!v.fecha_venta || new Date(v.fecha_venta) < new Date(fechaDesde))) return false
+    if (fechaHasta && (!v.fecha_venta || new Date(v.fecha_venta) > new Date(fechaHasta + 'T23:59:59'))) return false
+    const total = (v.total_kg ?? 0) * (v.precio_kg ?? 0)
+    if (totalMin && total < Number(totalMin)) return false
+    if (totalMax && total > Number(totalMax)) return false
+    return true
+  })
+
+  const clearFiltros = () => { setSearch(''); setFiltroCliente(''); setFechaDesde(''); setFechaHasta(''); setTotalMin(''); setTotalMax('') }
 
   const addItem = () => setForm(p => ({ ...p, items: [...p.items, { idlote_cafe: '', cantidad: '', precio_venta: '' }] }))
   const removeItem = (i: number) => setForm(p => ({ ...p, items: p.items.filter((_, idx) => idx !== i) }))
@@ -103,18 +122,58 @@ export default function VentasPage() {
             <p className="page-subtitle">Historial completo de transacciones comerciales</p>
           </div>
         </div>
-        <button className="btn btn-primary" onClick={() => { setFormError(null); setNewModal(true) }}>+ Nueva venta</button>
+        <div style={{ display:'flex', gap:'0.5rem', alignItems:'center' }}>
+          <button
+            onClick={() => setFiltroOpen(v => !v)}
+            style={{ display:'inline-flex', alignItems:'center', gap:'0.4rem', height:38, padding:'0 1rem', borderRadius:'var(--r-md)', border: filtroOpen||filtroCount>0 ? '1px solid var(--primary)' : '1px solid var(--border)', background: filtroOpen||filtroCount>0 ? 'rgba(196,122,44,0.12)' : 'var(--bg-input)', color: filtroOpen||filtroCount>0 ? 'var(--primary)' : 'var(--text-soft)', fontSize:'0.84rem', fontFamily:'var(--font-body)', cursor:'pointer', fontWeight:600 }}>
+            🎯 Filtros
+            {filtroCount>0 && <span style={{ minWidth:20, height:20, borderRadius:99, background:'var(--primary)', color:'#fff', fontSize:'0.65rem', fontWeight:700, display:'inline-flex', alignItems:'center', justifyContent:'center' }}>{filtroCount}</span>}
+            <span style={{ opacity:0.5, fontSize:'0.7rem' }}>{filtroOpen?'▲':'▼'}</span>
+          </button>
+          <button className="btn btn-primary" onClick={() => { setFormError(null); setNewModal(true) }}>+ Nueva venta</button>
+        </div>
       </div>
 
       {error && <div className="alert alert-error" style={{ marginBottom: '1rem' }}>⚠ {error}</div>}
 
-      <div className="toolbar">
-        <div className="toolbar-search">
-          <span className="search-icon">🔍</span>
-          <input type="text" placeholder="Buscar por cliente o ID…" value={search} onChange={e => setSearch(e.target.value)} />
+      <div style={{ display:'flex', alignItems:'center', gap:'0.5rem', flexWrap:'wrap', marginBottom:'0.75rem' }}>
+        <div style={{ position:'relative', flex:1, minWidth:180, maxWidth:360 }}>
+          <span style={{ position:'absolute', left:'0.7rem', top:'50%', transform:'translateY(-50%)', opacity:0.4, pointerEvents:'none' }}>🔍</span>
+          <input type="text" placeholder="Buscar por cliente o ID…" value={search} onChange={e => setSearch(e.target.value)}
+            style={{ width:'100%', height:36, background:'var(--bg-input)', border:'1px solid var(--border)', borderRadius:'var(--r-md)', padding:'0 0.9rem 0 2.1rem', color:'var(--text)', fontSize:'0.84rem', fontFamily:'var(--font-body)', outline:'none' }} />
         </div>
-        <span className="toolbar-count">{filtered.length} venta{filtered.length !== 1 ? 's' : ''}</span>
+        {(search||filtroCount>0) && <button onClick={clearFiltros} style={{ height:36, padding:'0 0.8rem', background:'transparent', border:'1px solid var(--border)', borderRadius:'var(--r-md)', color:'var(--text-muted)', fontSize:'0.8rem', fontFamily:'var(--font-body)', cursor:'pointer' }}>✕ Limpiar</button>}
+        <span style={{ fontSize:'0.78rem', color:'var(--text-dim)', fontWeight:500, marginLeft:'auto' }}>{filtered.length} venta{filtered.length!==1?'s':''}</span>
       </div>
+
+      {filtroOpen && (
+        <div style={{ background:'var(--bg-card)', border:'1px solid var(--border)', borderRadius:'var(--r-lg)', padding:'1rem', marginBottom:'1rem', display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(200px,1fr))', gap:'0.75rem' }}>
+          <div>
+            <label style={{ display:'block', fontSize:'0.68rem', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.06em', color:'var(--text-muted)', marginBottom:'0.3rem' }}>Cliente</label>
+            <select value={filtroCliente} onChange={e => setFiltroCliente(e.target.value)}
+              style={{ width:'100%', height:36, background:filtroCliente?'rgba(196,122,44,0.08)':'var(--bg-input)', border:filtroCliente?'1px solid var(--primary)':'1px solid var(--border)', borderRadius:'var(--r-md)', color:'var(--text)', fontSize:'0.82rem', fontFamily:'var(--font-body)', padding:'0 0.5rem', outline:'none', cursor:'pointer' }}>
+              <option value="">— Todos —</option>
+              {clienteOpts.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={{ display:'block', fontSize:'0.68rem', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.06em', color:'var(--text-muted)', marginBottom:'0.3rem' }}>📅 Fecha venta</label>
+            <div style={{ display:'flex', gap:'0.3rem', alignItems:'center' }}>
+              <input type="date" value={fechaDesde} onChange={e => setFechaDesde(e.target.value)} style={{ flex:1, height:36, background:(fechaDesde||fechaHasta)?'rgba(196,122,44,0.08)':'var(--bg-input)', border:(fechaDesde||fechaHasta)?'1px solid var(--primary)':'1px solid var(--border)', borderRadius:'var(--r-md)', color:'var(--text)', fontSize:'0.78rem', fontFamily:'var(--font-body)', padding:'0 0.4rem', outline:'none' }} />
+              <span style={{ color:'var(--text-muted)', flexShrink:0 }}>–</span>
+              <input type="date" value={fechaHasta} onChange={e => setFechaHasta(e.target.value)} style={{ flex:1, height:36, background:(fechaDesde||fechaHasta)?'rgba(196,122,44,0.08)':'var(--bg-input)', border:(fechaDesde||fechaHasta)?'1px solid var(--primary)':'1px solid var(--border)', borderRadius:'var(--r-md)', color:'var(--text)', fontSize:'0.78rem', fontFamily:'var(--font-body)', padding:'0 0.4rem', outline:'none' }} />
+            </div>
+          </div>
+          <div>
+            <label style={{ display:'block', fontSize:'0.68rem', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.06em', color:'var(--text-muted)', marginBottom:'0.3rem' }}>Total COP</label>
+            <div style={{ display:'flex', gap:'0.3rem', alignItems:'center' }}>
+              <input type="number" placeholder="Mín" value={totalMin} onChange={e => setTotalMin(e.target.value)} style={{ flex:1, height:36, background:(totalMin||totalMax)?'rgba(196,122,44,0.08)':'var(--bg-input)', border:(totalMin||totalMax)?'1px solid var(--primary)':'1px solid var(--border)', borderRadius:'var(--r-md)', color:'var(--text)', fontSize:'0.78rem', fontFamily:'var(--font-body)', padding:'0 0.4rem', outline:'none' }} />
+              <span style={{ color:'var(--text-muted)', flexShrink:0 }}>–</span>
+              <input type="number" placeholder="Máx" value={totalMax} onChange={e => setTotalMax(e.target.value)} style={{ flex:1, height:36, background:(totalMin||totalMax)?'rgba(196,122,44,0.08)':'var(--bg-input)', border:(totalMin||totalMax)?'1px solid var(--primary)':'1px solid var(--border)', borderRadius:'var(--r-md)', color:'var(--text)', fontSize:'0.78rem', fontFamily:'var(--font-body)', padding:'0 0.4rem', outline:'none' }} />
+            </div>
+          </div>
+        </div>
+      )}
 
       {loading ? (
         <div className="loading-center"><div className="spinner" /><span>Cargando…</span></div>

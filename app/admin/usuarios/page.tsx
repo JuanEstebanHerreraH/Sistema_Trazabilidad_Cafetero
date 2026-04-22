@@ -26,12 +26,30 @@ export default function UsuariosPage() {
   const [roles, setRoles] = useState<Rol[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [filtroRol, setFiltroRol] = useState('')
+  const [filtroEstado, setFiltroEstado] = useState('')
+  const [regDesde, setRegDesde] = useState('')
+  const [regHasta, setRegHasta] = useState('')
+  const [filtroOpen, setFiltroOpen] = useState(false)
   const [editUser, setEditUser] = useState<Usuario | null>(null)
   const [editForm, setEditForm] = useState({ idrol: '', estado_aprobacion: '' })
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [deleteId, setDeleteId] = useState<number | null>(null)
   const [deleting, setDeleting] = useState(false)
+
+  const filtroCount = [filtroRol, filtroEstado, regDesde||regHasta].filter(Boolean).length
+
+  const filtered = usuarios.filter(u => {
+    if (search && !u.nombre.toLowerCase().includes(search.toLowerCase()) && !u.email.toLowerCase().includes(search.toLowerCase())) return false
+    if (filtroRol && u.rol?.nombre !== filtroRol) return false
+    if (filtroEstado && u.estado_aprobacion !== filtroEstado) return false
+    if (regDesde && (!u.created_at || new Date(u.created_at) < new Date(regDesde))) return false
+    if (regHasta && (!u.created_at || new Date(u.created_at) > new Date(regHasta + 'T23:59:59'))) return false
+    return true
+  })
+
+  const clearFiltros = () => { setSearch(''); setFiltroRol(''); setFiltroEstado(''); setRegDesde(''); setRegHasta('') }
 
   const cargar = async () => {
     setLoading(true)
@@ -47,10 +65,6 @@ export default function UsuariosPage() {
   }
 
   useEffect(() => { cargar() }, [])
-
-  const filtered = search
-    ? usuarios.filter(u => u.nombre.toLowerCase().includes(search.toLowerCase()) || u.email.toLowerCase().includes(search.toLowerCase()))
-    : usuarios
 
   const openEdit = (u: Usuario) => {
     const rolId = roles.find(r => r.nombre === u.rol?.nombre)?.idrol ?? ''
@@ -96,14 +110,55 @@ export default function UsuariosPage() {
             <p className="page-subtitle">Gestión de cuentas y roles del sistema</p>
           </div>
         </div>
+        </div>
+        <button onClick={() => setFiltroOpen(v => !v)}
+          style={{ display:'inline-flex', alignItems:'center', gap:'0.4rem', height:38, padding:'0 1rem', borderRadius:'var(--r-md)', border: filtroOpen||filtroCount>0 ? '1px solid var(--primary)' : '1px solid var(--border)', background: filtroOpen||filtroCount>0 ? 'rgba(196,122,44,0.12)' : 'var(--bg-input)', color: filtroOpen||filtroCount>0 ? 'var(--primary)' : 'var(--text-soft)', fontSize:'0.84rem', fontFamily:'var(--font-body)', cursor:'pointer', fontWeight:600 }}>
+          🎯 Filtros
+          {filtroCount>0 && <span style={{ minWidth:20, height:20, borderRadius:99, background:'var(--primary)', color:'#fff', fontSize:'0.65rem', fontWeight:700, display:'inline-flex', alignItems:'center', justifyContent:'center' }}>{filtroCount}</span>}
+          <span style={{ opacity:0.5, fontSize:'0.7rem' }}>{filtroOpen?'▲':'▼'}</span>
+        </button>
       </div>
 
-      <div className="toolbar">
-        <div className="toolbar-search">
-          <span className="search-icon">🔍</span>
-          <input type="text" placeholder="Buscar por nombre o email…" value={search} onChange={e => setSearch(e.target.value)} />
+      <div style={{ display:'flex', alignItems:'center', gap:'0.5rem', flexWrap:'wrap', marginBottom:'0.75rem' }}>
+        <div style={{ position:'relative', flex:1, minWidth:180, maxWidth:360 }}>
+          <span style={{ position:'absolute', left:'0.7rem', top:'50%', transform:'translateY(-50%)', opacity:0.4, pointerEvents:'none' }}>🔍</span>
+          <input type="text" placeholder="Buscar por nombre o email…" value={search} onChange={e => setSearch(e.target.value)}
+            style={{ width:'100%', height:36, background:'var(--bg-input)', border:'1px solid var(--border)', borderRadius:'var(--r-md)', padding:'0 0.9rem 0 2.1rem', color:'var(--text)', fontSize:'0.84rem', fontFamily:'var(--font-body)', outline:'none' }} />
         </div>
-        <span className="toolbar-count">{filtered.length} usuario{filtered.length !== 1 ? 's' : ''}</span>
+        {(search||filtroCount>0) && <button onClick={clearFiltros} style={{ height:36, padding:'0 0.8rem', background:'transparent', border:'1px solid var(--border)', borderRadius:'var(--r-md)', color:'var(--text-muted)', fontSize:'0.8rem', fontFamily:'var(--font-body)', cursor:'pointer' }}>✕ Limpiar</button>}
+        <span style={{ fontSize:'0.78rem', color:'var(--text-dim)', fontWeight:500, marginLeft:'auto' }}>{filtered.length} usuario{filtered.length!==1?'s':''}</span>
+      </div>
+
+      {filtroOpen && (
+        <div style={{ background:'var(--bg-card)', border:'1px solid var(--border)', borderRadius:'var(--r-lg)', padding:'1rem', marginBottom:'1rem', display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(200px,1fr))', gap:'0.75rem' }}>
+          <div>
+            <label style={{ display:'block', fontSize:'0.68rem', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.06em', color:'var(--text-muted)', marginBottom:'0.3rem' }}>Rol</label>
+            <select value={filtroRol} onChange={e => setFiltroRol(e.target.value)}
+              style={{ width:'100%', height:36, background:filtroRol?'rgba(196,122,44,0.08)':'var(--bg-input)', border:filtroRol?'1px solid var(--primary)':'1px solid var(--border)', borderRadius:'var(--r-md)', color:'var(--text)', fontSize:'0.82rem', fontFamily:'var(--font-body)', padding:'0 0.5rem', outline:'none', cursor:'pointer' }}>
+              <option value="">— Todos —</option>
+              {roles.map(r => <option key={r.idrol} value={r.nombre}>{r.nombre}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={{ display:'block', fontSize:'0.68rem', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.06em', color:'var(--text-muted)', marginBottom:'0.3rem' }}>Estado</label>
+            <select value={filtroEstado} onChange={e => setFiltroEstado(e.target.value)}
+              style={{ width:'100%', height:36, background:filtroEstado?'rgba(196,122,44,0.08)':'var(--bg-input)', border:filtroEstado?'1px solid var(--primary)':'1px solid var(--border)', borderRadius:'var(--r-md)', color:'var(--text)', fontSize:'0.82rem', fontFamily:'var(--font-body)', padding:'0 0.5rem', outline:'none', cursor:'pointer' }}>
+              <option value="">— Todos —</option>
+              <option value="aprobado">✅ Aprobado</option>
+              <option value="pendiente">⏳ Pendiente</option>
+              <option value="rechazado">❌ Rechazado</option>
+            </select>
+          </div>
+          <div>
+            <label style={{ display:'block', fontSize:'0.68rem', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.06em', color:'var(--text-muted)', marginBottom:'0.3rem' }}>📅 Fecha registro</label>
+            <div style={{ display:'flex', gap:'0.3rem', alignItems:'center' }}>
+              <input type="date" value={regDesde} onChange={e => setRegDesde(e.target.value)} style={{ flex:1, height:36, background:(regDesde||regHasta)?'rgba(196,122,44,0.08)':'var(--bg-input)', border:(regDesde||regHasta)?'1px solid var(--primary)':'1px solid var(--border)', borderRadius:'var(--r-md)', color:'var(--text)', fontSize:'0.78rem', fontFamily:'var(--font-body)', padding:'0 0.4rem', outline:'none' }} />
+              <span style={{ color:'var(--text-muted)', flexShrink:0 }}>–</span>
+              <input type="date" value={regHasta} onChange={e => setRegHasta(e.target.value)} style={{ flex:1, height:36, background:(regDesde||regHasta)?'rgba(196,122,44,0.08)':'var(--bg-input)', border:(regDesde||regHasta)?'1px solid var(--primary)':'1px solid var(--border)', borderRadius:'var(--r-md)', color:'var(--text)', fontSize:'0.78rem', fontFamily:'var(--font-body)', padding:'0 0.4rem', outline:'none' }} />
+            </div>
+          </div>
+        </div>
+      )}
       </div>
 
       {loading ? (

@@ -22,29 +22,42 @@ interface VentaDetalle {
   detalle_venta: DetalleVenta[]
 }
 
-function InfoBlock({ label, value }: { label: string; value: string }) {
-  return (
-    <div style={{ background: 'var(--bg)', borderRadius: 'var(--r)', padding: '0.45rem 0.65rem' }}>
-      <div style={{ fontSize: '0.64rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>{label}</div>
-      <div style={{ fontSize: '0.88rem', color: 'var(--text-soft)', fontWeight: 600, marginTop: '0.1rem' }}>{value}</div>
-    </div>
-  )
-}
-
 export default function Ventas() {
   const supabase = createClient()
   const { data: clientes } = useRead('cliente', 'idcliente, nombre', 'nombre')
+
   const [detalleVenta, setDetalleVenta] = useState<VentaDetalle | null>(null)
   const [loadingDetalle, setLoadingDetalle] = useState(false)
 
   const verDetalle = useCallback(async (idventa: number) => {
-    setLoadingDetalle(true); setDetalleVenta(null)
+    setLoadingDetalle(true)
+    setDetalleVenta(null)
     const { data } = await supabase
       .from('venta')
-      .select('idventa, fecha_venta, total_kg, precio_kg, notas, cliente(nombre), detalle_venta(iddetalle_venta, cantidad, precio_venta, lote_cafe(idlote_cafe, variedad, finca(nombre)))')
-      .eq('idventa', idventa).single()
-    setDetalleVenta(data as any); setLoadingDetalle(false)
+      .select(`
+        idventa, fecha_venta, total_kg, precio_kg, notas,
+        cliente(nombre),
+        detalle_venta(iddetalle_venta, cantidad, precio_venta,
+          lote_cafe(idlote_cafe, variedad, finca(nombre)))
+      `)
+      .eq('idventa', idventa)
+      .single()
+    setDetalleVenta(data as any)
+    setLoadingDetalle(false)
   }, [supabase])
+
+  const fields = [
+    { key: 'fecha_venta', label: 'Fecha de venta', type: 'datetime-local', required: true },
+    {
+      key: 'idcliente', label: 'Cliente comprador', type: 'select', required: true,
+      options: clientes.map(c => ({ value: c.idcliente, label: c.nombre })),
+    },
+    { section: 'Detalles económicos' } as any,
+    { key: 'total_kg',  label: 'Total vendido (kg)',    type: 'number', required: false, step: '0.01', min: '0', placeholder: 'Ej: 500.00' },
+    { key: 'precio_kg', label: 'Precio por kg (COP)',   type: 'number', required: false, step: '1',    min: '0', placeholder: 'Ej: 18500' },
+    { section: 'Información adicional' } as any,
+    { key: 'notas', label: 'Notas', type: 'textarea', required: false, colSpan: 'full', placeholder: 'Condiciones de pago, instrucciones…' },
+  ]
 
   return (
     <>
@@ -57,36 +70,32 @@ export default function Ventas() {
         searchPlaceholder="Buscar por cliente o notas…"
         columns={[
           { key: 'idventa',     label: '#',         sortable: true },
-          { key: 'fecha_venta', label: 'Fecha',     sortable: true, render: v => v ? new Date(v).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' }) : '—' },
-          { key: 'idcliente',   label: 'Cliente',   render: (_, r) => r.cliente?.nombre || <span style={{ color: 'var(--text-muted)' }}>—</span> },
-          { key: 'total_kg',    label: 'Total kg',  sortable: true, render: v => v ? <strong>{Number(v).toLocaleString('es-CO')} kg</strong> : '—' },
-          { key: 'precio_kg',   label: 'Precio/kg', sortable: true, render: v => v ? `$${Number(v).toLocaleString('es-CO')}` : '—' },
-          { key: 'total_cop',   label: 'Total COP', render: (_, r) => {
-            const total = (r.total_kg ?? 0) * (r.precio_kg ?? 0)
-            return total > 0 ? <strong style={{ color: 'var(--green)' }}>${total.toLocaleString('es-CO')}</strong> : '—'
-          }},
-          { key: 'items', label: 'Ítems', render: (_, r) => (
-            <button className="btn btn-secondary btn-sm" onClick={e => { e.stopPropagation(); verDetalle(r.idventa) }}>👁 Ver</button>
-          )},
+          { key: 'fecha_venta', label: 'Fecha',      sortable: true, render: v => v ? new Date(v).toLocaleDateString('es-CO', { day:'2-digit', month:'short', year:'numeric' }) : '—' },
+          { key: 'idcliente',   label: 'Cliente',    render: (_, r) => r.cliente?.nombre || <span style={{color:'var(--text-muted)'}}>—</span> },
+          { key: 'total_kg',    label: 'Total Kg',   sortable: true, render: v => v ? <strong>{Number(v).toLocaleString('es-CO')} kg</strong> : '—' },
+          { key: 'precio_kg',   label: 'Precio/kg',  sortable: true, render: v => v ? `$${Number(v).toLocaleString('es-CO')}` : '—' },
+          {
+            key: 'total_cop', label: 'Total COP',
+            render: (_, r) => {
+              const total = (r.total_kg ?? 0) * (r.precio_kg ?? 0)
+              return total > 0 ? <strong style={{ color: 'var(--green)' }}>${total.toLocaleString('es-CO')}</strong> : '—'
+            }
+          },
+          {
+            key: 'items', label: 'Ítems',
+            render: (_, r) => (
+              <button className="btn btn-secondary btn-sm" onClick={(e) => { e.stopPropagation(); verDetalle(r.idventa) }}>
+                👁 Ver
+              </button>
+            ),
+          },
         ]}
-        fields={[
-          { key: 'fecha_venta', label: 'Fecha de venta',           type: 'datetime-local', required: true },
-          { key: 'idcliente',   label: 'Cliente comprador',        type: 'select', required: true, options: clientes.map(c => ({ value: c.idcliente, label: c.nombre })) },
-          { section: 'Detalles económicos' } as any,
-          { key: 'total_kg',    label: 'Total vendido (kg)',        type: 'number', required: false, step: '0.01', min: '0' },
-          { key: 'precio_kg',   label: 'Precio por kg (COP)',       type: 'number', required: false, step: '1',    min: '0' },
-          { section: 'Información adicional' } as any,
-          { key: 'notas',       label: 'Notas', type: 'textarea', required: false, colSpan: 'full' },
-        ]}
+        fields={fields}
         filterSelects={[
-          { key: 'idcliente', label: 'Cliente', options: clientes.map(c => ({ value: String(c.idcliente), label: c.nombre })) },
+          ...(clientes.length > 0 ? [{ key: 'idcliente', label: 'Cliente', options: clientes.map(c => ({ value: String(c.idcliente), label: c.nombre })) }] : []),
         ]}
         dateFilters={[
           { key: 'fecha_venta', label: 'Fecha de venta' },
-        ]}
-        rangeFilters={[
-          { key: 'total_kg',  label: 'Total kg' },
-          { key: 'total_cop', label: 'Total COP', unit: '$', getValue: (r: any) => Number(r.total_kg ?? 0) * Number(r.precio_kg ?? 0) },
         ]}
       />
 
@@ -112,7 +121,7 @@ export default function Ventas() {
                 ${((detalleVenta.total_kg ?? 0) * (detalleVenta.precio_kg ?? 0)).toLocaleString('es-CO')} COP
               </span>
             </div>
-            {detalleVenta.detalle_venta?.length > 0 ? (
+            {detalleVenta.detalle_venta && detalleVenta.detalle_venta.length > 0 ? (
               <div>
                 <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-soft)', marginBottom: '0.5rem' }}>
                   📦 Lotes vendidos ({detalleVenta.detalle_venta.length} ítem{detalleVenta.detalle_venta.length > 1 ? 's' : ''}):
@@ -122,6 +131,7 @@ export default function Ventas() {
                     <div>
                       <span style={{ fontWeight: 600, color: 'var(--text)' }}>☕ {d.lote_cafe?.variedad ?? '—'}</span>
                       {d.lote_cafe?.finca && <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginLeft: '0.4rem' }}>· {d.lote_cafe.finca.nombre}</span>}
+                      <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginLeft: '0.4rem' }}>Lote #{d.lote_cafe?.idlote_cafe}</span>
                     </div>
                     <div style={{ textAlign: 'right' }}>
                       <div style={{ fontWeight: 700, color: 'var(--primary)' }}>{d.cantidad} kg</div>
@@ -144,5 +154,14 @@ export default function Ventas() {
         ) : null}
       </Modal>
     </>
+  )
+}
+
+function InfoBlock({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={{ background: 'var(--bg)', borderRadius: 'var(--r)', padding: '0.45rem 0.65rem' }}>
+      <div style={{ fontSize: '0.64rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>{label}</div>
+      <div style={{ fontSize: '0.88rem', color: 'var(--text-soft)', fontWeight: 600, marginTop: '0.1rem' }}>{value}</div>
+    </div>
   )
 }
