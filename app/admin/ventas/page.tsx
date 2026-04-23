@@ -147,29 +147,31 @@ export default function VentasPage() {
       </div>
 
       {filtroOpen && (
-        <div style={{ background:'var(--bg-card)', border:'1px solid var(--border)', borderRadius:'var(--r-lg)', padding:'1rem', marginBottom:'1rem', display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(200px,1fr))', gap:'0.75rem' }}>
-          <div>
-            <label style={{ display:'block', fontSize:'0.68rem', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.06em', color:'var(--text-muted)', marginBottom:'0.3rem' }}>Cliente</label>
-            <select value={filtroCliente} onChange={e => setFiltroCliente(e.target.value)}
-              style={{ width:'100%', height:36, background:filtroCliente?'rgba(196,122,44,0.08)':'var(--bg-input)', border:filtroCliente?'1px solid var(--primary)':'1px solid var(--border)', borderRadius:'var(--r-md)', color:'var(--text)', fontSize:'0.82rem', fontFamily:'var(--font-body)', padding:'0 0.5rem', outline:'none', cursor:'pointer' }}>
-              <option value="">— Todos —</option>
-              {clienteOpts.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
-          </div>
-          <div>
-            <label style={{ display:'block', fontSize:'0.68rem', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.06em', color:'var(--text-muted)', marginBottom:'0.3rem' }}>📅 Fecha venta</label>
-            <div style={{ display:'flex', gap:'0.3rem', alignItems:'center' }}>
-              <input type="date" value={fechaDesde} onChange={e => setFechaDesde(e.target.value)} style={{ flex:1, height:36, background:(fechaDesde||fechaHasta)?'rgba(196,122,44,0.08)':'var(--bg-input)', border:(fechaDesde||fechaHasta)?'1px solid var(--primary)':'1px solid var(--border)', borderRadius:'var(--r-md)', color:'var(--text)', fontSize:'0.78rem', fontFamily:'var(--font-body)', padding:'0 0.4rem', outline:'none' }} />
-              <span style={{ color:'var(--text-muted)', flexShrink:0 }}>–</span>
-              <input type="date" value={fechaHasta} onChange={e => setFechaHasta(e.target.value)} style={{ flex:1, height:36, background:(fechaDesde||fechaHasta)?'rgba(196,122,44,0.08)':'var(--bg-input)', border:(fechaDesde||fechaHasta)?'1px solid var(--primary)':'1px solid var(--border)', borderRadius:'var(--r-md)', color:'var(--text)', fontSize:'0.78rem', fontFamily:'var(--font-body)', padding:'0 0.4rem', outline:'none' }} />
+        <div style={{ background:'var(--bg-card)', border:'1px solid var(--border)', borderRadius:'var(--r-lg)', padding:'1rem 1.25rem', marginBottom:'1rem' }}>
+          <div style={{ display:'flex', flexWrap:'wrap', gap:'1rem', alignItems:'flex-end' }}>
+            <div style={{ display:'flex', flexDirection:'column', gap:'0.3rem', minWidth:160 }}>
+              <label style={{ fontSize:'0.68rem', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.06em', color:'var(--text-muted)' }}>Cliente</label>
+              <select value={filtroCliente} onChange={e => setFiltroCliente(e.target.value)}
+                style={{ height:38, minWidth:160, background:filtroCliente?'rgba(196,122,44,0.08)':'var(--bg-input)', border:filtroCliente?'1px solid var(--primary)':'1px solid var(--border)', borderRadius:'var(--r-md)', color:'var(--text)', fontSize:'0.84rem', fontFamily:'var(--font-body)', padding:'0 0.6rem', outline:'none', cursor:'pointer' }}>
+                <option value="">— Todos —</option>
+                {clienteOpts.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
             </div>
-          </div>
-          <div>
-            <label style={{ display:'block', fontSize:'0.68rem', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.06em', color:'var(--text-muted)', marginBottom:'0.3rem' }}>Total COP</label>
-            <div style={{ display:'flex', gap:'0.3rem', alignItems:'center' }}>
-              <input type="number" placeholder="Mín" value={totalMin} onChange={e => setTotalMin(e.target.value)} style={{ flex:1, height:36, background:(totalMin||totalMax)?'rgba(196,122,44,0.08)':'var(--bg-input)', border:(totalMin||totalMax)?'1px solid var(--primary)':'1px solid var(--border)', borderRadius:'var(--r-md)', color:'var(--text)', fontSize:'0.78rem', fontFamily:'var(--font-body)', padding:'0 0.4rem', outline:'none' }} />
-              <span style={{ color:'var(--text-muted)', flexShrink:0 }}>–</span>
-              <input type="number" placeholder="Máx" value={totalMax} onChange={e => setTotalMax(e.target.value)} style={{ flex:1, height:36, background:(totalMin||totalMax)?'rgba(196,122,44,0.08)':'var(--bg-input)', border:(totalMin||totalMax)?'1px solid var(--primary)':'1px solid var(--border)', borderRadius:'var(--r-md)', color:'var(--text)', fontSize:'0.78rem', fontFamily:'var(--font-body)', padding:'0 0.4rem', outline:'none' }} />
+            <div style={{ display:'flex', flexDirection:'column', gap:'0.3rem' }}>
+              <label style={{ fontSize:'0.68rem', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.06em', color:'var(--text-muted)' }}>📅 Fecha venta</label>
+              <div style={{ display:'flex', gap:'0.4rem', alignItems:'center' }}>
+                <input type="date" value={fechaDesde} onChange={e => setFechaDesde(e.target.value)} style={{ height:38, width:140, background:(fechaDesde||fechaHasta)?'rgba(196,122,44,0.08)':'var(--bg-input)', border:(fechaDesde||fechaHasta)?'1px solid var(--primary)':'1px solid var(--border)', borderRadius:'var(--r-md)', color:'var(--text)', fontSize:'0.84rem', fontFamily:'var(--font-body)', padding:'0 0.5rem', outline:'none' }} />
+                <span style={{ color:'var(--text-muted)' }}>–</span>
+                <input type="date" value={fechaHasta} onChange={e => setFechaHasta(e.target.value)} style={{ height:38, width:140, background:(fechaDesde||fechaHasta)?'rgba(196,122,44,0.08)':'var(--bg-input)', border:(fechaDesde||fechaHasta)?'1px solid var(--primary)':'1px solid var(--border)', borderRadius:'var(--r-md)', color:'var(--text)', fontSize:'0.84rem', fontFamily:'var(--font-body)', padding:'0 0.5rem', outline:'none' }} />
+              </div>
+            </div>
+            <div style={{ display:'flex', flexDirection:'column', gap:'0.3rem' }}>
+              <label style={{ fontSize:'0.68rem', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.06em', color:'var(--text-muted)' }}>Total COP</label>
+              <div style={{ display:'flex', gap:'0.4rem', alignItems:'center' }}>
+                <input type="number" placeholder="Mín" value={totalMin} onChange={e => setTotalMin(e.target.value)} style={{ height:38, width:120, background:(totalMin||totalMax)?'rgba(196,122,44,0.08)':'var(--bg-input)', border:(totalMin||totalMax)?'1px solid var(--primary)':'1px solid var(--border)', borderRadius:'var(--r-md)', color:'var(--text)', fontSize:'0.84rem', fontFamily:'var(--font-body)', padding:'0 0.5rem', outline:'none' }} />
+                <span style={{ color:'var(--text-muted)' }}>–</span>
+                <input type="number" placeholder="Máx" value={totalMax} onChange={e => setTotalMax(e.target.value)} style={{ height:38, width:120, background:(totalMin||totalMax)?'rgba(196,122,44,0.08)':'var(--bg-input)', border:(totalMin||totalMax)?'1px solid var(--primary)':'1px solid var(--border)', borderRadius:'var(--r-md)', color:'var(--text)', fontSize:'0.84rem', fontFamily:'var(--font-body)', padding:'0 0.5rem', outline:'none' }} />
+              </div>
             </div>
           </div>
         </div>

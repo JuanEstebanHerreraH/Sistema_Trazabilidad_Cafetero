@@ -260,43 +260,47 @@ export default function CrudPage({
 
       {/* Filter Panel */}
       {open && hasPanel && (
-        <div style={{ background:'var(--bg-card)', border:BRD, borderRadius:'var(--r-lg)', padding:'1rem', marginBottom:'1rem', display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(200px,1fr))', gap:'0.75rem', alignItems:'end' }}>
-          {filterSelects?.map(fs=>(
-            <div key={fs.key}>
-              <label style={{ display:'block', fontSize:'0.68rem', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.06em', color:'var(--text-muted)', marginBottom:'0.3rem' }}>{fs.label}</label>
-              <select value={fv[fs.key]??''} onChange={e=>{ setFv(p=>({...p,[fs.key]:e.target.value})); rp() }}
-                style={{ width:'100%', height:36, background:fv[fs.key]?ACT_BG:IBG, border:fv[fs.key]?ACT_BRD:BRD, borderRadius:RMD, color:TXT, fontSize:'0.82rem', fontFamily:FONT, padding:'0 0.5rem', outline:'none', cursor:'pointer' }}>
-                <option value="">— Todos —</option>
-                {fs.options.map(o=><option key={o.value} value={o.value}>{o.label}</option>)}
-              </select>
-            </div>
-          ))}
-          {dateFilters?.map(d=>{
-            const ac = !!(df[d.key]||dt[d.key])
-            return (
-              <div key={d.key}>
-                <label style={{ display:'block', fontSize:'0.68rem', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.06em', color:'var(--text-muted)', marginBottom:'0.3rem' }}>📅 {d.label}</label>
-                <div style={{ display:'flex', gap:'0.3rem', alignItems:'center' }}>
-                  <input type="date" value={df[d.key]??''} onChange={e=>{ setDf(p=>({...p,[d.key]:e.target.value})); rp() }} style={inp(ac)} />
-                  <span style={{ color:'var(--text-muted)', flexShrink:0 }}>–</span>
-                  <input type="date" value={dt[d.key]??''} onChange={e=>{ setDt(p=>({...p,[d.key]:e.target.value})); rp() }} style={inp(ac)} />
-                </div>
+        <div style={{ background:'var(--bg-card)', border:BRD, borderRadius:'var(--r-lg)', padding:'1rem 1.25rem', marginBottom:'1rem' }}>
+          <div style={{ display:'flex', flexWrap:'wrap', gap:'1rem', alignItems:'flex-end' }}>
+            {filterSelects?.map(fs=>(
+              <div key={fs.key} style={{ display:'flex', flexDirection:'column', gap:'0.3rem', minWidth:160 }}>
+                <label style={{ fontSize:'0.68rem', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.06em', color:'var(--text-muted)' }}>{fs.label}</label>
+                <select value={fv[fs.key]??''} onChange={e=>{ setFv(p=>({...p,[fs.key]:e.target.value})); rp() }}
+                  style={{ height:38, minWidth:160, background:fv[fs.key]?ACT_BG:IBG, border:fv[fs.key]?ACT_BRD:BRD, borderRadius:RMD, color:TXT, fontSize:'0.84rem', fontFamily:FONT, padding:'0 0.6rem', outline:'none', cursor:'pointer' }}>
+                  <option value="">— Todos —</option>
+                  {fs.options.map(o=><option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
               </div>
-            )
-          })}
-          {rangeFilters?.map(r=>{
-            const ac = !!(rmin[r.key]||rmax[r.key])
-            return (
-              <div key={r.key}>
-                <label style={{ display:'block', fontSize:'0.68rem', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.06em', color:'var(--text-muted)', marginBottom:'0.3rem' }}>{r.label}{r.unit?` (${r.unit})`:''}</label>
-                <div style={{ display:'flex', gap:'0.3rem', alignItems:'center' }}>
-                  <input type="number" placeholder="Mín" value={rmin[r.key]??''} onChange={e=>{ setRmin(p=>({...p,[r.key]:e.target.value})); rp() }} style={inp(ac)} />
-                  <span style={{ color:'var(--text-muted)', flexShrink:0 }}>–</span>
-                  <input type="number" placeholder="Máx" value={rmax[r.key]??''} onChange={e=>{ setRmax(p=>({...p,[r.key]:e.target.value})); rp() }} style={inp(ac)} />
+            ))}
+            {dateFilters?.map(d=>{
+              const ac = !!(df[d.key]||dt[d.key])
+              const dateStyle: React.CSSProperties = { height:38, width:140, background:ac?ACT_BG:IBG, border:ac?ACT_BRD:BRD, borderRadius:RMD, color:TXT, fontSize:'0.84rem', fontFamily:FONT, padding:'0 0.5rem', outline:'none' }
+              return (
+                <div key={d.key} style={{ display:'flex', flexDirection:'column', gap:'0.3rem' }}>
+                  <label style={{ fontSize:'0.68rem', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.06em', color:'var(--text-muted)' }}>📅 {d.label}</label>
+                  <div style={{ display:'flex', gap:'0.4rem', alignItems:'center' }}>
+                    <input type="date" value={df[d.key]??''} onChange={e=>{ setDf(p=>({...p,[d.key]:e.target.value})); rp() }} style={dateStyle} />
+                    <span style={{ color:'var(--text-muted)', fontSize:'0.85rem' }}>–</span>
+                    <input type="date" value={dt[d.key]??''} onChange={e=>{ setDt(p=>({...p,[d.key]:e.target.value})); rp() }} style={dateStyle} />
+                  </div>
                 </div>
-              </div>
-            )
-          })}
+              )
+            })}
+            {rangeFilters?.map(r=>{
+              const ac = !!(rmin[r.key]||rmax[r.key])
+              const numStyle: React.CSSProperties = { height:38, width:110, background:ac?ACT_BG:IBG, border:ac?ACT_BRD:BRD, borderRadius:RMD, color:TXT, fontSize:'0.84rem', fontFamily:FONT, padding:'0 0.5rem', outline:'none' }
+              return (
+                <div key={r.key} style={{ display:'flex', flexDirection:'column', gap:'0.3rem' }}>
+                  <label style={{ fontSize:'0.68rem', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.06em', color:'var(--text-muted)' }}>{r.label}{r.unit?` (${r.unit})`:''}</label>
+                  <div style={{ display:'flex', gap:'0.4rem', alignItems:'center' }}>
+                    <input type="number" placeholder="Mín" value={rmin[r.key]??''} onChange={e=>{ setRmin(p=>({...p,[r.key]:e.target.value})); rp() }} style={numStyle} />
+                    <span style={{ color:'var(--text-muted)', fontSize:'0.85rem' }}>–</span>
+                    <input type="number" placeholder="Máx" value={rmax[r.key]??''} onChange={e=>{ setRmax(p=>({...p,[r.key]:e.target.value})); rp() }} style={numStyle} />
+                  </div>
+                </div>
+              )
+            })}
+          </div>
         </div>
       )}
 

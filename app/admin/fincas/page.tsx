@@ -14,7 +14,7 @@ export default function FincasPage() {
     <CrudPage
       title="Fincas" subtitle="Registro de fincas cafeteras" icon="🌿"
       table="finca" idField="idfinca"
-      selectQuery="idfinca, nombre, ubicacion, area_hectareas, altitud_msnm, idproductor, productor:idproductor(nombre)"
+      selectQuery="idfinca, nombre, ubicacion, area_hectareas, idproductor, productor:idproductor(nombre)"
       orderBy="nombre"
       searchKeys={['nombre', 'ubicacion', 'productor.nombre']}
       searchPlaceholder="Buscar finca, ubicación o productor…"
@@ -26,10 +26,9 @@ export default function FincasPage() {
         { key: 'productor',      label: 'Productor', render: v => v?.nombre ?? '—' },
       ]}
       fields={[
-        { key: 'nombre',         label: 'Nombre',          required: true, placeholder: 'Finca El Paraíso' },
-        { key: 'ubicacion',      label: 'Ubicación',       placeholder: 'Pitalito, Huila' },
+        { key: 'nombre',         label: 'Nombre',         required: true, placeholder: 'Finca El Paraíso' },
+        { key: 'ubicacion',      label: 'Ubicación',      placeholder: 'Pitalito, Huila' },
         { key: 'area_hectareas', label: 'Área (ha)',       type: 'number', placeholder: '5.5' },
-        { key: 'altitud_msnm',   label: 'Altitud (msnm)', type: 'number', placeholder: '1800' },
         { key: 'idproductor',    label: 'ID Productor',    type: 'number', placeholder: 'ID del productor' },
       ]}
       filterSelects={[
