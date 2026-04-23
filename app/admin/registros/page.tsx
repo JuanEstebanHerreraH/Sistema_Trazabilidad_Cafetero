@@ -9,7 +9,7 @@ const PAGE_SIZE = 15
 export default function RegistrosPage() {
   const { data, loading, error, insert, update, remove } = useCrud(
     'registro_proceso', 'idregistro_proceso',
-    'idregistro_proceso, fecha_inicio, fecha_fin, notas, idproceso, idusuario, lote_cafe:idlote_cafe(variedad), proceso:idproceso(nombre), usuario:idusuario(nombre)',
+    'idregistro_proceso, fecha_inicio, fecha_fin, notas, calificacion, idproceso, idusuario, lote_cafe:idlote_cafe(variedad), proceso:idproceso(nombre), usuario:idusuario(nombre)',
     'fecha_inicio'
   )
   const { data: procesos } = useRead('proceso',  'idproceso, nombre',  'nombre')
@@ -22,6 +22,8 @@ export default function RegistrosPage() {
   const [fUsuario, setFUsuario] = useState('')
   const [fDesde,   setFDesde]   = useState('')
   const [fHasta,   setFHasta]   = useState('')
+  const [calMin,   setCalMin]   = useState('')
+  const [calMax,   setCalMax]   = useState('')
   const [panelOpen,setPanelOpen]= useState(false)
   const [page, setPage] = useState(1)
 
@@ -39,9 +41,9 @@ export default function RegistrosPage() {
 
   const rows = data as any[]
 
-  const activeFilters = [fProceso, fUsuario, fDesde||fHasta].filter(Boolean).length
+  const activeFilters = [fProceso, fUsuario, fDesde||fHasta, calMin||calMax].filter(Boolean).length
   const hasActive = !!(search || activeFilters)
-  const clearAll = () => { setSearch(''); setFProceso(''); setFUsuario(''); setFDesde(''); setFHasta(''); setPage(1) }
+  const clearAll = () => { setSearch(''); setFProceso(''); setFUsuario(''); setFDesde(''); setFHasta(''); setCalMin(''); setCalMax(''); setPage(1) }
 
   const filtered = useMemo(() => {
     let r = rows
@@ -49,7 +51,6 @@ export default function RegistrosPage() {
       const q = search.toLowerCase()
       r = r.filter((x: any) =>
         x.lote_cafe?.variedad?.toLowerCase().includes(q) ||
-        x.processo?.nome?.toLowerCase().includes(q) ||
         x.proceso?.nombre?.toLowerCase().includes(q) ||
         x.usuario?.nombre?.toLowerCase().includes(q) ||
         (x.notas ?? '').toLowerCase().includes(q)
@@ -59,8 +60,10 @@ export default function RegistrosPage() {
     if (fUsuario) r = r.filter((x: any) => String(x.idusuario) === fUsuario)
     if (fDesde)   r = r.filter((x: any) => x.fecha_inicio >= fDesde)
     if (fHasta)   r = r.filter((x: any) => x.fecha_inicio <= fHasta + 'T23:59:59')
+    if (calMin)   r = r.filter((x: any) => x.calificacion != null && Number(x.calificacion) >= Number(calMin))
+    if (calMax)   r = r.filter((x: any) => x.calificacion != null && Number(x.calificacion) <= Number(calMax))
     return [...r].sort((a: any, b: any) => new Date(b.fecha_inicio).getTime() - new Date(a.fecha_inicio).getTime())
-  }, [rows, search, fProceso, fUsuario, fDesde, fHasta])
+  }, [rows, search, fProceso, fUsuario, fDesde, fHasta, calMin, calMax])
 
   const pageCount = Math.ceil(filtered.length / PAGE_SIZE)
   const paged = filtered.slice((page-1)*PAGE_SIZE, page*PAGE_SIZE)
@@ -72,6 +75,7 @@ export default function RegistrosPage() {
   const openEdit = (r: any) => {
     setForm({
       idlote_cafe: r.idlote_cafe, idproceso: r.idproceso, idusuario: r.idusuario ?? '',
+      calificacion: r.calificacion ?? '',
       fecha_inicio: r.fecha_inicio?.slice(0,16) ?? '',
       fecha_fin: r.fecha_fin?.slice(0,16) ?? '',
       notas: r.notas ?? '',
@@ -86,6 +90,7 @@ export default function RegistrosPage() {
     const payload = {
       idlote_cafe: Number(form.idlote_cafe), idproceso: Number(form.idproceso),
       idusuario: form.idusuario ? Number(form.idusuario) : null,
+      calificacion: form.calificacion !== '' && form.calificacion != null ? Number(form.calificacion) : null,
       fecha_inicio: form.fecha_inicio, fecha_fin: form.fecha_fin || null,
       notas: form.notas || null,
     }
@@ -176,6 +181,16 @@ export default function RegistrosPage() {
                 ))}
               </div>
             </div>
+            <div style={{ display:'flex', flexDirection:'column', gap:'0.3rem' }}>
+              <label style={{ fontSize:'0.68rem', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.06em', color:'var(--text-muted)' }}>⭐ Calificación</label>
+              <div style={{ display:'flex', gap:'0.4rem', alignItems:'center' }}>
+                <input type="number" placeholder="Mín" min="0" max="10" step="0.1" value={calMin} onChange={e => { setCalMin(e.target.value); setPage(1) }}
+                  style={{ height:38, width:80, background:(calMin||calMax)?'rgba(196,122,44,0.08)':'var(--bg-input)', border:(calMin||calMax)?'1px solid var(--primary)':'1px solid var(--border)', borderRadius:'var(--r-md)', color:'var(--text)', fontSize:'0.84rem', fontFamily:'var(--font-body)', padding:'0 0.5rem', outline:'none' }} />
+                <span style={{ color:'var(--text-muted)' }}>–</span>
+                <input type="number" placeholder="Máx" min="0" max="10" step="0.1" value={calMax} onChange={e => { setCalMax(e.target.value); setPage(1) }}
+                  style={{ height:38, width:80, background:(calMin||calMax)?'rgba(196,122,44,0.08)':'var(--bg-input)', border:(calMin||calMax)?'1px solid var(--primary)':'1px solid var(--border)', borderRadius:'var(--r-md)', color:'var(--text)', fontSize:'0.84rem', fontFamily:'var(--font-body)', padding:'0 0.5rem', outline:'none' }} />
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -195,7 +210,7 @@ export default function RegistrosPage() {
             <table className="data-table">
               <thead><tr>
                 <th>#</th><th>Lote</th><th>Proceso</th><th>Responsable</th>
-                <th>Inicio</th><th>Fin</th><th>Notas</th><th>Acciones</th>
+                <th>Inicio</th><th>Fin</th><th>Calificación</th><th>Notas</th><th>Acciones</th>
               </tr></thead>
               <tbody>
                 {paged.map((r: any) => (
@@ -212,6 +227,12 @@ export default function RegistrosPage() {
                     <td style={{ fontSize:'0.82rem', color: r.fecha_fin ? 'var(--text-soft)' : 'var(--amber)' }}>
                       {r.fecha_fin ? fmtDate(r.fecha_fin) : <span style={{ fontWeight:600 }}>En curso</span>}
                     </td>
+                    <td style={{ textAlign:'center', whiteSpace:'nowrap' }}>
+                      {r.calificacion != null
+                        ? <strong style={{ fontSize:'0.9rem', color: Number(r.calificacion)>=8.5?'var(--green)':Number(r.calificacion)>=6?'var(--amber)':'var(--red,#f87171)' }}>
+                            {Number(r.calificacion).toFixed(1)}<span style={{ fontSize:'0.65rem', opacity:0.6 }}>/10</span>
+                          </strong>
+                        : <span style={{ color:'var(--text-muted)', fontSize:'0.75rem' }}>—</span>}
                     <td style={{ maxWidth:220, fontSize:'0.78rem', color:'var(--text-dim)' }}>
                       {r.notas
                         ? <span style={{ display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical' as any, overflow:'hidden' }}>{r.notas}</span>
@@ -269,17 +290,26 @@ export default function RegistrosPage() {
                 ))}
               </div>
 
-              {/* Responsable destacado */}
-              <div style={{ background: viewRec.usuario ? 'rgba(196,122,44,0.06)' : 'var(--bg)', border: viewRec.usuario ? '1px solid rgba(196,122,44,0.2)' : '1px solid var(--border-soft)', borderRadius:'var(--r-lg)', padding:'0.85rem 1rem', display:'flex', alignItems:'center', gap:'0.75rem' }}>
-                <div style={{ width:42, height:42, borderRadius:'50%', background:'var(--bg-elevated)', border:'2px solid var(--border-med)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'1.1rem', flexShrink:0 }}>
-                  👤
-                </div>
-                <div>
-                  <div style={{ fontSize:'0.65rem', color:'var(--text-muted)', textTransform:'uppercase', fontWeight:700, letterSpacing:'0.06em' }}>Responsable / Catador</div>
-                  <div style={{ fontSize:'1rem', fontWeight:700, color: viewRec.usuario ? 'var(--primary)' : 'var(--text-dim)', marginTop:'0.1rem' }}>
-                    {viewRec.usuario?.nombre ?? 'Sin asignar'}
+              {/* Responsable + Calificación */}
+              <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:'0.75rem', alignItems:'stretch' }}>
+                <div style={{ background: viewRec.usuario ? 'rgba(196,122,44,0.06)' : 'var(--bg)', border: viewRec.usuario ? '1px solid rgba(196,122,44,0.2)' : '1px solid var(--border-soft)', borderRadius:'var(--r-lg)', padding:'0.85rem 1rem', display:'flex', alignItems:'center', gap:'0.75rem' }}>
+                  <div style={{ width:42, height:42, borderRadius:'50%', background:'var(--bg-elevated)', border:'2px solid var(--border-med)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'1.1rem', flexShrink:0 }}>👤</div>
+                  <div>
+                    <div style={{ fontSize:'0.65rem', color:'var(--text-muted)', textTransform:'uppercase', fontWeight:700, letterSpacing:'0.06em' }}>Responsable / Catador</div>
+                    <div style={{ fontSize:'1rem', fontWeight:700, color: viewRec.usuario ? 'var(--primary)' : 'var(--text-dim)', marginTop:'0.1rem' }}>
+                      {viewRec.usuario?.nombre ?? 'Sin asignar'}
+                    </div>
                   </div>
                 </div>
+                {viewRec.calificacion != null && (
+                  <div style={{ background:'var(--bg)', border:'1px solid var(--border-soft)', borderRadius:'var(--r-lg)', padding:'0.85rem 1rem', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', minWidth:90 }}>
+                    <div style={{ fontSize:'0.62rem', color:'var(--text-muted)', textTransform:'uppercase', fontWeight:700, letterSpacing:'0.06em', marginBottom:'0.25rem' }}>Cata</div>
+                    <div style={{ fontSize:'1.6rem', fontWeight:800, color: Number(viewRec.calificacion)>=8.5?'var(--green)':Number(viewRec.calificacion)>=6?'var(--amber)':'var(--red,#f87171)', lineHeight:1 }}>
+                      {Number(viewRec.calificacion).toFixed(1)}
+                    </div>
+                    <div style={{ fontSize:'0.65rem', color:'var(--text-muted)', marginTop:'0.1rem' }}>/10</div>
+                  </div>
+                )}
               </div>
 
               {/* Notas completas */}
@@ -335,6 +365,11 @@ export default function RegistrosPage() {
                     <option value="">— Sin asignar —</option>
                     {(usuarios as any[]).map((u:any) => <option key={u.idusuario} value={u.idusuario}>{u.nombre}</option>)}
                   </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Calificación de cata (0–10)</label>
+                  <input className="form-input" type="number" min="0" max="10" step="0.1" placeholder="Ej: 8.5"
+                    value={form.calificacion??''} onChange={e=>setForm(p=>({...p,calificacion:e.target.value}))} />
                 </div>
                 <div className="form-group">
                   <label className="form-label">Fecha de inicio <span className="form-required">*</span></label>
