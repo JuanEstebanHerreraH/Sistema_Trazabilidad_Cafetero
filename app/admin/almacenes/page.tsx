@@ -107,18 +107,23 @@ export default function AlmacenesPage() {
     setDeleting(false); setDeleteId(null); await cargar()
   }
 
+  const [stockMin, setStockMin] = useState('')
+  const [stockMax, setStockMax] = useState('')
+
   const filtered = almacenes.filter(a => {
     const ms = !search || a.nombre.toLowerCase().includes(search.toLowerCase()) || (a.ubicacion ?? '').toLowerCase().includes(search.toLowerCase())
+    const stock = a.stock_actual ?? 0
+    const mStock = (!stockMin || stock >= Number(stockMin)) && (!stockMax || stock <= Number(stockMax))
     const mc = (!capMin || (a.capacidad_kg != null && a.capacidad_kg >= Number(capMin))) &&
                (!capMax || (a.capacidad_kg != null && a.capacidad_kg <= Number(capMax)))
-    return ms && mc
+    return ms && mc && mStock
   })
   const pageCount = Math.ceil(filtered.length / PAGE_SIZE)
   const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
-  const hasActive = !!(search || capMin || capMax)
-  const clearAll = () => { setSearch(''); setCapMin(''); setCapMax(''); setPage(1) }
-  const activeFilters = [capMin || capMax].filter(Boolean).length
+  const hasActive = !!(search || capMin || capMax || stockMin || stockMax)
+  const clearAll = () => { setSearch(''); setCapMin(''); setCapMax(''); setStockMin(''); setStockMax(''); setPage(1) }
+  const activeFilters = [capMin || capMax, stockMin || stockMax].filter(Boolean).length
 
   const getBarColor = (pct: number) => pct >= 95 ? 'var(--red,#e05050)' : pct >= 80 ? 'var(--amber)' : pct >= 50 ? 'var(--blue)' : 'var(--green)'
   const getBadge = (alm: Almacen) => {
@@ -194,13 +199,23 @@ export default function AlmacenesPage() {
         <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--r-lg)', padding: '1rem 1.25rem', marginBottom: '1rem' }}>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'flex-end' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-              <label style={{ fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)' }}>Capacidad (kg)</label>
+              <label style={{ fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)' }}>⚖️ Stock actual (kg)</label>
+              <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                <input type="number" placeholder="Mín" value={stockMin} onChange={e => { setStockMin(e.target.value); setPage(1) }}
+                  style={{ height: 38, width: 110, background: (stockMin || stockMax) ? 'rgba(196,122,44,0.08)' : 'var(--bg-input)', border: (stockMin || stockMax) ? '1px solid var(--primary)' : '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text)', fontSize: '0.84rem', fontFamily: 'var(--font-body)', padding: '0 0.5rem', outline: 'none' }} />
+                <span style={{ color: 'var(--text-muted)' }}>–</span>
+                <input type="number" placeholder="Máx" value={stockMax} onChange={e => { setStockMax(e.target.value); setPage(1) }}
+                  style={{ height: 38, width: 110, background: (stockMin || stockMax) ? 'rgba(196,122,44,0.08)' : 'var(--bg-input)', border: (stockMin || stockMax) ? '1px solid var(--primary)' : '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text)', fontSize: '0.84rem', fontFamily: 'var(--font-body)', padding: '0 0.5rem', outline: 'none' }} />
+              </div>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+              <label style={{ fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)' }}>📦 Capacidad máx. (kg)</label>
               <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
                 <input type="number" placeholder="Mín" value={capMin} onChange={e => { setCapMin(e.target.value); setPage(1) }}
-                  style={{ height: 38, width: 120, background: (capMin || capMax) ? 'rgba(196,122,44,0.08)' : 'var(--bg-input)', border: (capMin || capMax) ? '1px solid var(--primary)' : '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text)', fontSize: '0.84rem', fontFamily: 'var(--font-body)', padding: '0 0.5rem', outline: 'none' }} />
+                  style={{ height: 38, width: 110, background: (capMin || capMax) ? 'rgba(196,122,44,0.08)' : 'var(--bg-input)', border: (capMin || capMax) ? '1px solid var(--primary)' : '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text)', fontSize: '0.84rem', fontFamily: 'var(--font-body)', padding: '0 0.5rem', outline: 'none' }} />
                 <span style={{ color: 'var(--text-muted)' }}>–</span>
                 <input type="number" placeholder="Máx" value={capMax} onChange={e => { setCapMax(e.target.value); setPage(1) }}
-                  style={{ height: 38, width: 120, background: (capMin || capMax) ? 'rgba(196,122,44,0.08)' : 'var(--bg-input)', border: (capMin || capMax) ? '1px solid var(--primary)' : '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text)', fontSize: '0.84rem', fontFamily: 'var(--font-body)', padding: '0 0.5rem', outline: 'none' }} />
+                  style={{ height: 38, width: 110, background: (capMin || capMax) ? 'rgba(196,122,44,0.08)' : 'var(--bg-input)', border: (capMin || capMax) ? '1px solid var(--primary)' : '1px solid var(--border)', borderRadius: 'var(--r-md)', color: 'var(--text)', fontSize: '0.84rem', fontFamily: 'var(--font-body)', padding: '0 0.5rem', outline: 'none' }} />
               </div>
             </div>
           </div>

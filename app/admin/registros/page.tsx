@@ -233,6 +233,7 @@ export default function RegistrosPage() {
                             {Number(r.calificacion).toFixed(1)}<span style={{ fontSize:'0.65rem', opacity:0.6 }}>/10</span>
                           </strong>
                         : <span style={{ color:'var(--text-muted)', fontSize:'0.75rem' }}>—</span>}
+                    </td>
                     <td style={{ maxWidth:220, fontSize:'0.78rem', color:'var(--text-dim)' }}>
                       {r.notas
                         ? <span style={{ display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical' as any, overflow:'hidden' }}>{r.notas}</span>
