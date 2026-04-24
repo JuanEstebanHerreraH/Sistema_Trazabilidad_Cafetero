@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS public.resena_lote (
 );
 
 -- Índices
-CREATE INDEX IF NOT EXISTS idx_resena_lote_idlote ON public.resena_lote(idlote_cafe);
+CREATE INDEX IF NOT EXISTS idx_resena_lote_idlote    ON public.resena_lote(idlote_cafe);
 CREATE INDEX IF NOT EXISTS idx_resena_lote_idusuario ON public.resena_lote(idusuario);
 
 -- RLS
@@ -24,12 +24,9 @@ CREATE POLICY "allow_authenticated_all" ON public.resena_lote
   FOR ALL USING (auth.role() = 'authenticated')
   WITH CHECK (auth.role() = 'authenticated');
 
--- Agregar columna tipo_autor a registro_proceso para diferenciar catador vs admin
-ALTER TABLE public.registro_proceso
-  ADD COLUMN IF NOT EXISTS tipo_autor text DEFAULT 'catador';
-
 -- Vista combinada de reseñas (catadores + clientes)
-CREATE OR REPLACE VIEW public.v_resenas_lote AS
+DROP VIEW IF EXISTS public.v_resenas_lote;
+CREATE VIEW public.v_resenas_lote AS
   -- Reseñas de catadores (registro_proceso con notas o calificacion)
   SELECT
     rp.idregistro_proceso  AS id,
@@ -41,13 +38,13 @@ CREATE OR REPLACE VIEW public.v_resenas_lote AS
     'catador'::text        AS tipo,
     rp.calificacion,
     rp.notas               AS texto,
-    rp.proceso             AS proceso_nombre,
+    pr.nombre              AS proceso_nombre,
     rp.fecha_inicio        AS created_at
   FROM public.registro_proceso rp
   LEFT JOIN public.lote_cafe lc ON lc.idlote_cafe = rp.idlote_cafe
-  LEFT JOIN public.usuario   u  ON u.idusuario = rp.idusuario
-  LEFT JOIN public.rol       r  ON r.idrol = u.idrol
-  LEFT JOIN public.proceso   pr ON pr.idproceso = rp.idproceso
+  LEFT JOIN public.usuario   u  ON u.idusuario    = rp.idusuario
+  LEFT JOIN public.rol       r  ON r.idrol        = u.idrol
+  LEFT JOIN public.proceso   pr ON pr.idproceso   = rp.idproceso
   WHERE rp.notas IS NOT NULL OR rp.calificacion IS NOT NULL
 
   UNION ALL
@@ -63,12 +60,14 @@ CREATE OR REPLACE VIEW public.v_resenas_lote AS
     'cliente'::text        AS tipo,
     rl.calificacion,
     rl.texto,
-    NULL                   AS proceso_nombre,
+    NULL::text             AS proceso_nombre,
     rl.created_at
   FROM public.resena_lote rl
   LEFT JOIN public.lote_cafe lc ON lc.idlote_cafe = rl.idlote_cafe
-  LEFT JOIN public.usuario   u  ON u.idusuario = rl.idusuario
-  LEFT JOIN public.rol       r  ON r.idrol = u.idrol;
+  LEFT JOIN public.usuario   u  ON u.idusuario    = rl.idusuario
+  LEFT JOIN public.rol       r  ON r.idrol        = u.idrol;
 
 -- Grant access
 GRANT SELECT ON public.v_resenas_lote TO authenticated;
+GRANT ALL    ON public.resena_lote    TO authenticated;
+GRANT USAGE  ON SEQUENCE resena_lote_idresena_seq TO authenticated;

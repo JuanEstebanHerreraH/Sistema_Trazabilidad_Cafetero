@@ -19,7 +19,7 @@ interface LineaCarrito { lote: Lote; cantidad: number }
 
 interface VentaHistorial {
   idventa: number; fecha_venta: string; total_kg: number | null; precio_kg: number | null; notas: string | null
-  detalle_venta: { iddetalle_venta: number; cantidad: number; precio_venta: number; lote_cafe: { variedad: string; finca: { nombre: string } | null } | null }[]
+  detalle_venta: { iddetalle_venta: number; cantidad: number; precio_venta: number; lote_cafe: { idlote_cafe: number; variedad: string; finca: { nombre: string } | null } | null }[]
 }
 
 export default function PortalCliente({ usuario }: { usuario: UsuarioPortal }) {
@@ -82,7 +82,7 @@ export default function PortalCliente({ usuario }: { usuario: UsuarioPortal }) {
         ? supabase.from('venta').select(`
             idventa, fecha_venta, total_kg, precio_kg, notas,
             detalle_venta(iddetalle_venta, cantidad, precio_venta,
-              lote_cafe(variedad, finca(nombre)))
+              lote_cafe(idlote_cafe, variedad, finca(nombre)))
           `).eq('idcliente', clienteId).order('fecha_venta', { ascending: false })
         : Promise.resolve({ data: [], error: null }),
     ])
@@ -548,9 +548,9 @@ function HistorialCompras({ ventas, idusuario, onVerCatalogo }: { ventas: VentaH
                           <span style={{ fontWeight: 600, color: 'var(--text-soft)', whiteSpace: 'nowrap' }}>{d.cantidad} kg — ${(d.cantidad * d.precio_venta).toLocaleString('es-CO')}</span>
                           {d.lote_cafe && (
                             <button
-                              onClick={() => openReseña({ id: (d.lote_cafe as any).idlote_cafe ?? 0, nombre: d.lote_cafe!.variedad })}
-                              style={{ height: 28, padding: '0 0.65rem', borderRadius: 'var(--r-md)', border: resDone.has((d.lote_cafe as any).idlote_cafe ?? 0) ? '1px solid var(--green)' : '1px solid var(--border)', background: resDone.has((d.lote_cafe as any).idlote_cafe ?? 0) ? 'rgba(34,197,94,0.1)' : 'var(--bg-input)', color: resDone.has((d.lote_cafe as any).idlote_cafe ?? 0) ? 'var(--green)' : 'var(--text-soft)', fontSize: '0.72rem', fontFamily: 'var(--font-body)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                              {resDone.has((d.lote_cafe as any).idlote_cafe ?? 0) ? '✓ Reseña enviada' : '⭐ Dejar reseña'}
+                              onClick={() => openReseña({ id: d.lote_cafe!.idlote_cafe, nombre: d.lote_cafe!.variedad })}
+                              style={{ height: 28, padding: '0 0.65rem', borderRadius: 'var(--r-md)', border: resDone.has(d.lote_cafe!.idlote_cafe) ? '1px solid var(--green)' : '1px solid var(--border)', background: resDone.has(d.lote_cafe!.idlote_cafe) ? 'rgba(34,197,94,0.1)' : 'var(--bg-input)', color: resDone.has(d.lote_cafe!.idlote_cafe) ? 'var(--green)' : 'var(--text-soft)', fontSize: '0.72rem', fontFamily: 'var(--font-body)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                              {resDone.has(d.lote_cafe!.idlote_cafe) ? '✓ Reseña enviada' : '⭐ Dejar reseña'}
                             </button>
                           )}
                         </div>
