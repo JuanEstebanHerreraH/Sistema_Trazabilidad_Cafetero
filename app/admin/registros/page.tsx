@@ -190,6 +190,17 @@ export default function RegistrosPage() {
               </select>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+              <label style={labelStyle}>Tipo de reseña</label>
+              <div style={{ display: 'flex', gap: '0.35rem' }}>
+                {(['todos', 'catador'] as const).map(t => (
+                  <button key={t} style={{ height: 38, padding: '0 0.85rem', borderRadius: 'var(--r-md)', border: t === 'catador' ? '1px solid var(--primary)' : '1px solid var(--border)', background: t === 'catador' ? 'rgba(196,122,44,0.12)' : 'var(--bg-input)', color: t === 'catador' ? 'var(--primary)' : 'var(--text-soft)', fontSize: '0.8rem', fontFamily: 'var(--font-body)', cursor: 'default', fontWeight: 400 }}>
+                    {t === 'todos' ? 'Todos' : '🎯 Catador'}
+                  </button>
+                ))}
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-dim)', alignSelf: 'center', marginLeft: '0.25rem' }}>Reseñas de clientes → ver en Lotes</span>
+              </div>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
               <label style={labelStyle}>📅 Fecha inicio</label>
               <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
                 <input type="date" value={fDesde} onChange={e => { setFDesde(e.target.value); setLotePage(1) }}

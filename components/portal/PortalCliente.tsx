@@ -255,7 +255,7 @@ export default function PortalCliente({ usuario }: { usuario: UsuarioPortal }) {
           comprando={comprando} errorCompra={errorCompra}
           onVerCatalogo={() => setTab('catalogo')} />
       ) : (
-        <HistorialCompras ventas={ventas} onVerCatalogo={() => setTab('catalogo')} />
+        <HistorialCompras ventas={ventas} idusuario={usuario.idusuario} onVerCatalogo={() => setTab('catalogo')} />
       )}
     </div>
   )
@@ -416,13 +416,40 @@ function CarritoView({ carrito, totalKg, totalCOP, onQuitar, onConfirmar, compra
 // ── Historial de compras ──────────────────────────────────────────────────────
 const PAGE_SIZE_H = 8
 
-function HistorialCompras({ ventas, onVerCatalogo }: { ventas: VentaHistorial[]; onVerCatalogo: () => void }) {
+function HistorialCompras({ ventas, idusuario, onVerCatalogo }: { ventas: VentaHistorial[]; idusuario: number; onVerCatalogo: () => void }) {
+  const supabase = createClient()
   const [expandido, setExpandido] = useState<number | null>(null)
   const [search, setSearch] = useState('')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [page, setPage] = useState(1)
+
+  // Review modal state
+  const [resModal,  setResModal]  = useState(false)
+  const [resLote,   setResLote]   = useState<{ id: number; nombre: string } | null>(null)
+  const [resForm,   setResForm]   = useState({ texto: '', calificacion: '' })
+  const [resSaving, setResSaving] = useState(false)
+  const [resErr,    setResErr]    = useState<string | null>(null)
+  const [resDone,   setResDone]   = useState<Set<number>>(new Set())
+
+  const openReseña = (lote: { id: number; nombre: string }) => {
+    setResLote(lote); setResForm({ texto: '', calificacion: '' }); setResErr(null); setResModal(true)
+  }
+
+  const submitReseña = async () => {
+    if (!resForm.texto.trim() && !resForm.calificacion) { setResErr('Escribe una reseña o pon una calificación.'); return }
+    setResSaving(true); setResErr(null)
+    const { error } = await supabase.from('resena_lote').insert({
+      idlote_cafe:  resLote!.id,
+      idusuario,
+      calificacion: resForm.calificacion ? Number(resForm.calificacion) : null,
+      texto:        resForm.texto.trim() || null,
+    })
+    if (error) { setResErr(error.message); setResSaving(false); return }
+    setResDone(prev => new Set(prev).add(resLote!.id))
+    setResSaving(false); setResModal(false)
+  }
 
   const ventasFiltradas = useMemo(() => {
     let r = ventas
@@ -513,12 +540,19 @@ function HistorialCompras({ ventas, onVerCatalogo }: { ventas: VentaHistorial[];
                   {abierto && (
                     <div style={{ borderTop: '1px solid var(--border-soft)', padding: '0.6rem 1rem 0.75rem' }}>
                       {(v.detalle_venta ?? []).map(d => (
-                        <div key={d.iddetalle_venta} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.3rem 0', fontSize: '0.8rem', borderBottom: '1px solid var(--border-soft)' }}>
-                          <span style={{ color: 'var(--text-soft)' }}>
+                        <div key={d.iddetalle_venta} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.35rem 0', fontSize: '0.8rem', borderBottom: '1px solid var(--border-soft)', gap: '0.5rem', flexWrap: 'wrap' }}>
+                          <span style={{ color: 'var(--text-soft)', flex: 1 }}>
                             ☕ <strong style={{ color: 'var(--text)' }}>{d.lote_cafe?.variedad ?? '—'}</strong>
                             {d.lote_cafe?.finca ? <span style={{ color: 'var(--text-dim)' }}> · {d.lote_cafe.finca.nombre}</span> : null}
                           </span>
-                          <span style={{ fontWeight: 600, color: 'var(--text-soft)' }}>{d.cantidad} kg — ${(d.cantidad * d.precio_venta).toLocaleString('es-CO')}</span>
+                          <span style={{ fontWeight: 600, color: 'var(--text-soft)', whiteSpace: 'nowrap' }}>{d.cantidad} kg — ${(d.cantidad * d.precio_venta).toLocaleString('es-CO')}</span>
+                          {d.lote_cafe && (
+                            <button
+                              onClick={() => openReseña({ id: (d.lote_cafe as any).idlote_cafe ?? 0, nombre: d.lote_cafe!.variedad })}
+                              style={{ height: 28, padding: '0 0.65rem', borderRadius: 'var(--r-md)', border: resDone.has((d.lote_cafe as any).idlote_cafe ?? 0) ? '1px solid var(--green)' : '1px solid var(--border)', background: resDone.has((d.lote_cafe as any).idlote_cafe ?? 0) ? 'rgba(34,197,94,0.1)' : 'var(--bg-input)', color: resDone.has((d.lote_cafe as any).idlote_cafe ?? 0) ? 'var(--green)' : 'var(--text-soft)', fontSize: '0.72rem', fontFamily: 'var(--font-body)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                              {resDone.has((d.lote_cafe as any).idlote_cafe ?? 0) ? '✓ Reseña enviada' : '⭐ Dejar reseña'}
+                            </button>
+                          )}
                         </div>
                       ))}
                       {v.notas && <div style={{ marginTop: '0.4rem', fontSize: '0.73rem', color: 'var(--text-muted)' }}>📝 {v.notas}</div>}
@@ -543,6 +577,49 @@ function HistorialCompras({ ventas, onVerCatalogo }: { ventas: VentaHistorial[];
             </div>
           )}
         </>
+      )}
+
+      {/* ── MODAL DE RESEÑA ── */}
+      {resModal && resLote && (
+        <div className="modal-overlay" onClick={() => setResModal(false)}>
+          <div className="modal-box" onClick={e => e.stopPropagation()} style={{ maxWidth: 440 }}>
+            <div className="modal-header">
+              <h3 className="modal-title">⭐ Reseña — {resLote.nombre}</h3>
+              <button className="modal-close" onClick={() => setResModal(false)}>✕</button>
+            </div>
+            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <p style={{ fontSize: '0.84rem', color: 'var(--text-dim)', margin: 0 }}>
+                Tu reseña aparecerá como <span style={{ padding: '0.15rem 0.5rem', borderRadius: 99, background: 'rgba(59,130,246,0.12)', color: 'var(--blue)', fontWeight: 700, fontSize: '0.75rem' }}>🛒 Cliente</span>
+              </p>
+              {resErr && <div className="alert alert-error" style={{ fontSize: '0.82rem' }}>⚠ {resErr}</div>}
+              <div className="form-group">
+                <label className="form-label">Calificación (0 – 10)</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <input type="range" min="0" max="10" step="0.5"
+                    value={resForm.calificacion || 0}
+                    onChange={e => setResForm(p => ({ ...p, calificacion: e.target.value }))}
+                    style={{ flex: 1, accentColor: 'var(--primary)' }} />
+                  <span style={{ minWidth: 36, textAlign: 'center', fontWeight: 700, fontSize: '1.1rem', color: resForm.calificacion ? (Number(resForm.calificacion) >= 8.5 ? 'var(--green)' : Number(resForm.calificacion) >= 6 ? 'var(--amber)' : 'var(--red,#f87171)') : 'var(--text-muted)' }}>
+                    {resForm.calificacion ? Number(resForm.calificacion).toFixed(1) : '—'}
+                  </span>
+                </div>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Tu reseña</label>
+                <textarea className="form-textarea" rows={4} style={{ resize: 'vertical' }}
+                  placeholder="¿Cómo fue tu experiencia? Aroma, sabor, calidad…"
+                  value={resForm.texto}
+                  onChange={e => setResForm(p => ({ ...p, texto: e.target.value }))} />
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => setResModal(false)} disabled={resSaving}>Cancelar</button>
+              <button className="btn btn-primary" onClick={submitReseña} disabled={resSaving}>
+                {resSaving ? 'Enviando…' : '⭐ Enviar reseña'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
