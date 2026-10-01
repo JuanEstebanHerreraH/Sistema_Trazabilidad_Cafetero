@@ -29,7 +29,7 @@ const estadoLabel: Record<string, string> = {
 const PAGE_SIZE = 10
 
 export default function PortalProductor({ usuario }: { usuario: UsuarioPortal }) {
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
   const [fincas, setFincas] = useState<Finca[]>([])
   const [lotes, setLotes] = useState<Lote[]>([])
   const [ganancias, setGanancias] = useState<LineaGanancia[]>([])
