@@ -5,36 +5,93 @@ import { createClient } from '../../utils/supabase/client'
 interface UsuarioPortal { idusuario: number; nombre: string; email: string }
 
 export default function OperadorPage() {
-  const supabase = createClient()
+  // Lazy init: supabase se crea UNA SOLA VEZ, incluso con Fast Refresh.
+  const [supabase] = useState(() => createClient())
   const [usuario, setUsuario] = useState<UsuarioPortal | null>(null)
   const [loading, setLoading] = useState(true)
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
   useEffect(() => {
+    let cancelled = false
     ;(async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { window.location.href = '/login'; return }
-      let { data } = await supabase.from('usuario')
-        .select('idusuario, nombre, email, rol:idrol(nombre)')
-        .eq('auth_uid', user.id).maybeSingle()
-      if (!data && user.email) {
-        const r = await supabase.from('usuario')
-          .select('idusuario, nombre, email, rol:idrol(nombre)')
-          .eq('email', user.email).maybeSingle()
-        data = r.data
-      }
-      const rol = (data as any)?.rol?.nombre
-      if (rol === 'Administrador') { window.location.href = '/admin'; return }
-      if (rol !== 'Operador') { window.location.href = '/portal'; return }
-      setUsuario(data as any)
-      setLoading(false)
-    })()
-  }, [])
+      try {
+        const { data: { user }, error: authError } = await supabase.auth.getUser()
+        if (authError || !user) {
+          console.warn('[OperadorPage] No hay sesión:', authError?.message)
+          window.location.href = '/login'
+          return
+        }
 
-  const handleLogout = async () => { await supabase.auth.signOut(); window.location.href = '/login' }
+        // 1) Buscar usuario por auth_uid
+        let { data, error: e1 } = await supabase.from('usuario')
+          .select('idusuario, nombre, email, estado_aprobacion, rol:idrol(nombre)')
+          .eq('auth_uid', user.id).maybeSingle()
+        if (e1) console.warn('[OperadorPage] Error query by auth_uid:', e1.message)
+
+        // 2) Fallback por email
+        if (!data && user.email) {
+          const r = await supabase.from('usuario')
+            .select('idusuario, nombre, email, estado_aprobacion, rol:idrol(nombre)')
+            .eq('email', user.email).maybeSingle()
+          if (r.error) console.warn('[OperadorPage] Error query by email:', r.error.message)
+          data = r.data
+        }
+
+        if (cancelled) return
+
+        if (!data) {
+          setErrorMsg('No se encontró tu perfil en el sistema. Contactá al administrador.')
+          return
+        }
+
+        const rol = (data as any)?.rol?.nombre
+        console.info('[OperadorPage] Rol detectado:', rol, 'Usuario:', data)
+
+        // Redirects limpios según rol
+        if (rol === 'Administrador') { window.location.href = '/admin'; return }
+        if (rol === 'Vendedor')      { window.location.href = '/vendedor'; return }
+        if (rol === 'Cliente')       { window.location.href = '/portal'; return }
+        if (rol === 'Productor')     { window.location.href = '/portal'; return }
+        if (rol === 'Catador')       { window.location.href = '/portal'; return }
+        if (rol === 'Transportista') { window.location.href = '/portal'; return }
+
+        // Si llegamos acá: es Operador o rol no detectado.
+        // NO redirigir en caso de rol no detectado para evitar bucle con /portal.
+        if (rol !== 'Operador') {
+          setErrorMsg(`No se pudo determinar tu rol (rol recibido: ${rol ?? 'null'}). Contactá al administrador.`)
+          return
+        }
+        setUsuario(data as any)
+      } catch (err: any) {
+        if (!cancelled) {
+          console.error('[OperadorPage] Error inesperado:', err)
+          setErrorMsg('Error al cargar el portal. Recargá la página.')
+        }
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [supabase])
+
+  const handleLogout = useCallback(async () => {
+    await supabase.auth.signOut()
+    window.location.href = '/login'
+  }, [supabase])
 
   if (loading) return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
       <div className="loading-center"><div className="spinner" /><span>Cargando portal operador…</span></div>
+    </div>
+  )
+
+  if (errorMsg) return (
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', padding: '1rem' }}>
+      <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--r-xl)', padding: '2rem', textAlign: 'center', maxWidth: 400 }}>
+        <div style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>⚠️</div>
+        <p style={{ color: 'var(--text-soft)', marginBottom: '1.25rem' }}>{errorMsg}</p>
+        <button className="btn btn-secondary" onClick={handleLogout}>Cerrar sesión</button>
+      </div>
     </div>
   )
 
@@ -81,7 +138,8 @@ function FilterChips({ chips, onClear }: {
 
 // ── Main portal ──────────────────────────────────────────────────
 function PortalOperador({ usuario, onLogout }: { usuario: UsuarioPortal; onLogout: () => void }) {
-  const supabase = useMemo(() => createClient(), [])
+  // Lazy init: supabase estable a lo largo del ciclo de vida del componente
+  const [supabase] = useState(() => createClient())
   const [tab, setTab] = useState<'lotes' | 'movimientos' | 'registros'>('lotes')
   const [lotes, setLotes] = useState<any[]>([])
   const [movimientos, setMovimientos] = useState<any[]>([])
@@ -90,15 +148,23 @@ function PortalOperador({ usuario, onLogout }: { usuario: UsuarioPortal; onLogou
 
   const cargar = useCallback(async () => {
     setLoading(true)
-    const [{ data: l }, { data: m }, { data: r }] = await Promise.all([
-      supabase.from('lote_cafe').select('idlote_cafe, variedad, peso_kg, estado, precio_kg, finca:idfinca(nombre)').order('created_at', { ascending: false }).limit(200),
-      supabase.from('movimiento_inventario').select('idmovimiento_inventario, tipo, fecha_movimiento, cantidad, notas, lote_cafe:idlote_cafe(variedad), almacen_origen:idalmacen_origen(nombre), almacen_destino:idalmacen_destino(nombre)').order('fecha_movimiento', { ascending: false }).limit(200),
-      supabase.from('registro_proceso').select('idregistro_proceso, fecha_inicio, fecha_fin, notas, lote_cafe:idlote_cafe(variedad, peso_kg), proceso:idproceso(nombre)').order('fecha_inicio', { ascending: false }).limit(200),
-    ])
-    setLotes(l ?? [])
-    setMovimientos(m ?? [])
-    setRegistros(r ?? [])
-    setLoading(false)
+    try {
+      const [lRes, mRes, rRes] = await Promise.all([
+        supabase.from('lote_cafe').select('idlote_cafe, variedad, peso_kg, estado, precio_kg, finca:idfinca(nombre)').order('created_at', { ascending: false }).limit(200),
+        supabase.from('movimiento_inventario').select('idmovimiento_inventario, tipo, fecha_movimiento, cantidad, notas, lote_cafe:idlote_cafe(variedad), almacen_origen:idalmacen_origen(nombre), almacen_destino:idalmacen_destino(nombre)').order('fecha_movimiento', { ascending: false }).limit(200),
+        supabase.from('registro_proceso').select('idregistro_proceso, fecha_inicio, fecha_fin, notas, lote_cafe:idlote_cafe(variedad, peso_kg), proceso:idproceso(nombre)').order('fecha_inicio', { ascending: false }).limit(200),
+      ])
+      if (lRes.error) console.warn('[PortalOperador] Error lotes:', lRes.error.message)
+      if (mRes.error) console.warn('[PortalOperador] Error movimientos:', mRes.error.message)
+      if (rRes.error) console.warn('[PortalOperador] Error registros:', rRes.error.message)
+      setLotes(lRes.data ?? [])
+      setMovimientos(mRes.data ?? [])
+      setRegistros(rRes.data ?? [])
+    } catch (err: any) {
+      console.error('[PortalOperador] Error inesperado:', err)
+    } finally {
+      setLoading(false)
+    }
   }, [supabase])
 
   useEffect(() => { cargar() }, [cargar])
