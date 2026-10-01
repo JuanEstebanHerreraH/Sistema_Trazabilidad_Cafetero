@@ -163,13 +163,20 @@ export default function Movimientos() {
     setEditRecord(null); setFormError(null); setModalOpen(true)
   }
 
-  const openEdit = (record: any) => {
+    const openEdit = (record: any) => {
+    // Coacción explícita: todo lo numérico va como string de dígitos o '',
+    // nunca null ni undefined, para que los <select> renderen bien.
+    const toSelectStr = (v: any): string =>
+      (v === null || v === undefined || v === '') ? '' : String(v)
     setForm({
-      tipo: record.tipo,
-      fecha_movimiento: record.fecha_movimiento ? record.fecha_movimiento.slice(0, 16) : '',
-      cantidad: record.cantidad, idlote_cafe: record.idlote_cafe ?? '',
-      idalmacen_origen: record.idalmacen_origen ?? '', idalmacen_destino: record.idalmacen_destino ?? '',
-      idusuario_responsable: record.idusuario_responsable ?? '', notas: record.notas ?? '',
+      tipo: record.tipo ?? 'entrada',
+      fecha_movimiento: record.fecha_movimiento ? String(record.fecha_movimiento).slice(0, 16) : '',
+      cantidad: toSelectStr(record.cantidad),
+      idlote_cafe: toSelectStr(record.idlote_cafe),
+      idalmacen_origen: toSelectStr(record.idalmacen_origen),
+      idalmacen_destino: toSelectStr(record.idalmacen_destino),
+      idusuario_responsable: toSelectStr(record.idusuario_responsable),
+      notas: record.notas ?? '',
     })
     setEditRecord(record); setFormError(null); setModalOpen(true)
   }
