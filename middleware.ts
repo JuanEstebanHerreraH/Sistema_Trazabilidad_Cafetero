@@ -66,11 +66,16 @@ export async function middleware(request: NextRequest) {
     estado = (userData as any)?.estado_aprobacion ?? 'pendiente'
 
     // Si el usuario no está aprobado y trata de acceder a zonas protegidas
-    if (estado !== 'aprobado' && !pathname.startsWith('/portal')) {
-      if (pathname !== '/login' && pathname !== '/register') {
-        return to('/portal')
-      }
-    }
+if (estado !== 'aprobado' && !pathname.startsWith('/portal')) {
+  if (pathname !== '/login' && pathname !== '/register') {
+    // Antes: return to('/portal') — causaba bucle con roles técnicos pendientes
+    // Ahora: forzar re-login explícito para que no pueda quedar atascado
+    const url = request.nextUrl.clone()
+    url.pathname = '/portal'
+    url.searchParams.set('pending', '1')
+    return NextResponse.redirect(url)
+  }
+}
   } catch (err) {
     console.warn('[middleware] excepción obteniendo rol:', err)
   }
