@@ -94,10 +94,12 @@ export default function Movimientos() {
 
   useEffect(() => { cargar() }, [cargar])
 
-  useEffect(() => {
-    if ((form.tipo === 'salida' || form.tipo === 'traslado') && form.idalmacen_origen) {
+   useEffect(() => {
+    const idOrigen = Number(form.idalmacen_origen)
+    if ((form.tipo === 'salida' || form.tipo === 'traslado')
+        && Number.isFinite(idOrigen) && idOrigen > 0) {
       setLoadingOrigen(true)
-      supabase.rpc('fn_contenido_almacen', { p_idalmacen: Number(form.idalmacen_origen) }).then(({ data }) => {
+      supabase.rpc('fn_contenido_almacen', { p_idalmacen: idOrigen }).then(({ data }) => {
         setContenidoOrigen((data ?? []) as ContenidoOrigen[])
         setLoadingOrigen(false)
       })
