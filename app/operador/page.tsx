@@ -81,7 +81,7 @@ function FilterChips({ chips, onClear }: {
 
 // ── Main portal ──────────────────────────────────────────────────
 function PortalOperador({ usuario, onLogout }: { usuario: UsuarioPortal; onLogout: () => void }) {
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
   const [tab, setTab] = useState<'lotes' | 'movimientos' | 'registros'>('lotes')
   const [lotes, setLotes] = useState<any[]>([])
   const [movimientos, setMovimientos] = useState<any[]>([])
