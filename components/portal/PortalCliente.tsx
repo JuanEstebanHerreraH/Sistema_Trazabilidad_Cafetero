@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { createClient } from '../../utils/supabase/client'
 import FilterBar from '../FilterBar'
+import TrazabilidadTimeline from '../TrazabilidadTimeline'
 
 // ── Singleton: evita re-crear el client en cada render (causa loop infinito) ──
 const supabase = createClient()
@@ -19,7 +20,29 @@ interface LineaCarrito { lote: Lote; cantidad: number }
 
 interface VentaHistorial {
   idventa: number; fecha_venta: string; total_kg: number | null; precio_kg: number | null; notas: string | null
-  detalle_venta: { iddetalle_venta: number; cantidad: number; precio_venta: number; lote_cafe: { idlote_cafe: number; variedad: string; finca: { nombre: string } | null } | null }[]
+  detalle_venta: {
+    iddetalle_venta: number
+    cantidad: number
+    precio_venta: number
+    lote_cafe: {
+      idlote_cafe: number
+      variedad: string
+      fecha_cosecha: string
+      peso_kg: number
+      precio_kg: number | null
+      finca: {
+        nombre: string
+        ubicacion: string | null
+        productor: { nombre: string } | null
+      } | null
+      registro_proceso: {
+        fecha_inicio: string | null
+        fecha_fin: string | null
+        responsable: string | null
+        proceso: { nombre: string } | null
+      }[]
+    } | null
+  }[]
 }
 
 export default function PortalCliente({ usuario }: { usuario: UsuarioPortal }) {
@@ -81,8 +104,14 @@ export default function PortalCliente({ usuario }: { usuario: UsuarioPortal }) {
       clienteId
         ? supabase.from('venta').select(`
             idventa, fecha_venta, total_kg, precio_kg, notas,
-            detalle_venta(iddetalle_venta, cantidad, precio_venta,
-              lote_cafe(idlote_cafe, variedad, finca(nombre)))
+            detalle_venta(
+              iddetalle_venta, cantidad, precio_venta,
+              lote_cafe(
+                idlote_cafe, variedad, fecha_cosecha, peso_kg, precio_kg,
+                finca(nombre, ubicacion, productor(nombre)),
+                registro_proceso(fecha_inicio, fecha_fin, responsable, proceso(nombre))
+              )
+            )
           `).eq('idcliente', clienteId).order('fecha_venta', { ascending: false })
         : Promise.resolve({ data: [], error: null }),
     ])
@@ -538,24 +567,37 @@ function HistorialCompras({ ventas, idusuario, onVerCatalogo }: { ventas: VentaH
                     <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginLeft: '0.25rem' }}>{abierto ? '▲' : '▼'}</span>
                   </button>
                   {abierto && (
-                    <div style={{ borderTop: '1px solid var(--border-soft)', padding: '0.6rem 1rem 0.75rem' }}>
-                      {(v.detalle_venta ?? []).map(d => (
-                        <div key={d.iddetalle_venta} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.35rem 0', fontSize: '0.8rem', borderBottom: '1px solid var(--border-soft)', gap: '0.5rem', flexWrap: 'wrap' }}>
-                          <span style={{ color: 'var(--text-soft)', flex: 1 }}>
-                            ☕ <strong style={{ color: 'var(--text)' }}>{d.lote_cafe?.variedad ?? '—'}</strong>
-                            {d.lote_cafe?.finca ? <span style={{ color: 'var(--text-dim)' }}> · {d.lote_cafe.finca.nombre}</span> : null}
-                          </span>
-                          <span style={{ fontWeight: 600, color: 'var(--text-soft)', whiteSpace: 'nowrap' }}>{d.cantidad} kg — ${(d.cantidad * d.precio_venta).toLocaleString('es-CO')}</span>
-                          {d.lote_cafe && (
+                    <div style={{ borderTop: '1px solid var(--border-soft)', padding: '1rem 1.1rem 1.25rem' }}>
+                      {(v.detalle_venta ?? []).map(d => d.lote_cafe && (
+                        <div key={d.iddetalle_venta} style={{ marginBottom: '1.25rem' }}>
+                          <TrazabilidadTimeline
+                            lote={d.lote_cafe}
+                            venta={{
+                              idventa: v.idventa,
+                              fecha_venta: v.fecha_venta,
+                              cantidad: d.cantidad,
+                              precio_venta: d.precio_venta,
+                            }}
+                          />
+                          <div style={{ marginTop: '0.75rem', display: 'flex', justifyContent: 'flex-end' }}>
                             <button
+                              className="btn btn-sm"
                               onClick={() => openReseña({ id: d.lote_cafe!.idlote_cafe, nombre: d.lote_cafe!.variedad })}
-                              style={{ height: 28, padding: '0 0.65rem', borderRadius: 'var(--r-md)', border: resDone.has(d.lote_cafe!.idlote_cafe) ? '1px solid var(--green)' : '1px solid var(--border)', background: resDone.has(d.lote_cafe!.idlote_cafe) ? 'rgba(34,197,94,0.1)' : 'var(--bg-input)', color: resDone.has(d.lote_cafe!.idlote_cafe) ? 'var(--green)' : 'var(--text-soft)', fontSize: '0.72rem', fontFamily: 'var(--font-body)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                              style={{
+                                background: resDone.has(d.lote_cafe!.idlote_cafe) ? 'rgba(74,103,65,0.12)' : 'var(--bg-card)',
+                                color: resDone.has(d.lote_cafe!.idlote_cafe) ? 'var(--green)' : 'var(--primary)',
+                                border: `2px solid ${resDone.has(d.lote_cafe!.idlote_cafe) ? 'var(--green)' : 'var(--primary)'}`,
+                              }}>
                               {resDone.has(d.lote_cafe!.idlote_cafe) ? '✓ Reseña enviada' : '⭐ Dejar reseña'}
                             </button>
-                          )}
+                          </div>
                         </div>
                       ))}
-                      {v.notas && <div style={{ marginTop: '0.4rem', fontSize: '0.73rem', color: 'var(--text-muted)' }}>📝 {v.notas}</div>}
+                      {v.notas && (
+                        <div style={{ marginTop: '0.75rem', padding: '0.85rem 1rem', background: 'var(--bg)', border: '1px solid var(--border-soft)', borderRadius: 'var(--r-md)', fontSize: '0.9rem', color: 'var(--text-soft)' }}>
+                          📝 <strong>Notas de la compra:</strong> {v.notas}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

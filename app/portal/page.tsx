@@ -5,6 +5,7 @@ import PortalCliente from '../../components/portal/PortalCliente'
 import PortalProductor from '../../components/portal/PortalProductor'
 import PortalCatador from '../../components/portal/PortalCatador'
 import PortalTransportista from '../../components/portal/PortalTransportista'
+import CafeLogo from '../../components/CafeLogo'
 
 interface UsuarioPortal {
   idusuario: number
@@ -122,21 +123,25 @@ export default function PortalPage() {
   return (
     <div className="portal-layout">
       <header className="portal-header">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <div style={{ width: 32, height: 32, background: 'linear-gradient(135deg, var(--primary), var(--primary-deep))', borderRadius: 'var(--r-md)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.9rem', boxShadow: '0 2px 10px var(--primary-glow)' }}>☕</div>
+        <div className="cafe-logo-wrap">
+          <div className="cafe-logo-mark" aria-hidden="true">
+            <CafeLogo size={30} color="#FAF4E8" />
+          </div>
           <div>
-            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.95rem', color: 'var(--text)' }}>CaféTrace</div>
-            <div style={{ fontSize: '0.67rem', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+            <div className="cafe-brand-name">CaféTrace</div>
+            <div className="cafe-role-tag">
               {getRolIcon(rolNombre)} {rolNombre}
             </div>
           </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: '0.84rem', color: 'var(--text)', fontWeight: 600 }}>{usuario.nombre}</div>
-            <div style={{ fontSize: '0.68rem', color: 'var(--text-dim)' }}>{usuario.email}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <div className="cafe-user-info">
+            <div className="cafe-user-name">{usuario.nombre}</div>
+            <div className="cafe-user-email">{usuario.email}</div>
           </div>
-          <button className="btn btn-secondary btn-sm" onClick={handleLogout}>Salir</button>
+          <button className="btn btn-secondary btn-sm" onClick={handleLogout} aria-label="Cerrar sesión">
+            🚪 Salir
+          </button>
         </div>
       </header>
 
