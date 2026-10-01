@@ -43,16 +43,27 @@ export async function middleware(request: NextRequest) {
   }
 
   // ── Autenticado: obtener rol ──────────────────────────────────────
+  // Usamos fn_rol_actual() (SECURITY DEFINER) en vez del join embedded
+  // porque la relación rol:idrol(nombre) no siempre resuelve bien desde
+  // el contexto SSR del middleware. La función existe desde PB-28 y
+  // devuelve el nombre del rol del usuario autenticado sin depender
+  // de que PostgREST pueda hacer el join.
   let rolNombre = ''
+  let estado = 'pendiente'
   try {
-    const { data } = await supabase
+    const { data: rolData, error: rolErr } = await supabase.rpc('fn_rol_actual')
+    if (rolErr) {
+      console.warn('[middleware] fn_rol_actual error:', rolErr.message)
+    }
+    rolNombre = (typeof rolData === 'string' ? rolData : '') || ''
+
+    // Estado de aprobación: query simple sin joins
+    const { data: userData } = await supabase
       .from('usuario')
-      .select('rol:idrol(nombre), estado_aprobacion')
+      .select('estado_aprobacion')
       .eq('auth_uid', user.id)
       .maybeSingle()
-
-    rolNombre = (data as any)?.rol?.nombre ?? ''
-    const estado = (data as any)?.estado_aprobacion ?? 'pendiente'
+    estado = (userData as any)?.estado_aprobacion ?? 'pendiente'
 
     // Si el usuario no está aprobado y trata de acceder a zonas protegidas
     if (estado !== 'aprobado' && !pathname.startsWith('/portal')) {
@@ -60,7 +71,20 @@ export async function middleware(request: NextRequest) {
         return to('/portal')
       }
     }
-  } catch {}
+  } catch (err) {
+    console.warn('[middleware] excepción obteniendo rol:', err)
+  }
+
+  // ── Salvaguarda anti-bucle: si no pudimos detectar rol, forzar
+  //    logout en vez de redirigir a /portal (que lo mandaría de vuelta)
+  if (!rolNombre && (pathname.startsWith('/operador') ||
+                     pathname.startsWith('/vendedor') ||
+                     pathname.startsWith('/admin'))) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/login'
+    url.searchParams.set('e', 'session')
+    return NextResponse.redirect(url)
+  }
 
   // ── Redirigir /login y /register si ya autenticado ────────────────
   if (pathname === '/login' || pathname === '/register') {
