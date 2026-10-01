@@ -149,12 +149,27 @@ export default function CrudPage({
     setSaving(true); setFErr(null)
     try {
       const p: Record<string,any> = {}
-      dfields.forEach(f => {
+      for (const f of dfields) {
         const v = form[f.key!]
-        if (v===''||v==null) p[f.key!] = f.required ? v : null
-        else if (f.type==='number') p[f.key!] = Number(v)
-        else p[f.key!] = v
-      })
+        const vacio = v === '' || v === null || v === undefined
+        if (vacio) {
+          if (f.required) {
+            // Antes se pasaba "" al INSERT/UPDATE y Postgres respondía
+            // "invalid input syntax for type integer". Ahora falla antes
+            // con un mensaje claro al usuario.
+            throw new Error(`El campo "${f.label ?? f.key}" es obligatorio.`)
+          }
+          p[f.key!] = null
+        } else if (f.type === 'number') {
+          const n = Number(v)
+          if (!Number.isFinite(n)) {
+            throw new Error(`El campo "${f.label ?? f.key}" debe ser numérico.`)
+          }
+          p[f.key!] = n
+        } else {
+          p[f.key!] = v
+        }
+      }
       if (editR) await update(editR[idField], p); else await insert(p)
       setModal(false)
     } catch(e: any) { setFErr(e.message) }
