@@ -38,7 +38,8 @@ interface VentaHistorial {
       registro_proceso: {
         fecha_inicio: string | null
         fecha_fin: string | null
-        responsable: string | null
+        notas: string | null
+        calificacion: number | null
         proceso: { nombre: string } | null
       }[]
     } | null
@@ -109,7 +110,7 @@ export default function PortalCliente({ usuario }: { usuario: UsuarioPortal }) {
               lote_cafe(
                 idlote_cafe, variedad, fecha_cosecha, peso_kg, precio_kg,
                 finca(nombre, ubicacion, productor(nombre)),
-                registro_proceso(fecha_inicio, fecha_fin, responsable, proceso(nombre))
+                registro_proceso(fecha_inicio, fecha_fin, notas, calificacion, proceso(nombre))
               )
             )
           `).eq('idcliente', clienteId).order('fecha_venta', { ascending: false })

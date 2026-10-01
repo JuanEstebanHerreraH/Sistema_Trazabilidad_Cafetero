@@ -18,7 +18,8 @@ interface LoteTrazabilidad {
   registro_proceso?: {
     fecha_inicio?: string | null
     fecha_fin?: string | null
-    responsable?: string | null
+    notas?: string | null
+    calificacion?: number | null
     proceso?: { nombre: string } | null
   }[]
 }
@@ -117,38 +118,66 @@ export default function TrazabilidadTimeline({
 
         {/* 3. PROCESOS (uno por cada registro_proceso) */}
         {procesos.length > 0 ? (
-          procesos.map((p, i) => (
-            <div className="traz-paso" key={`proc-${i}`}>
-              <div className="traz-punto traz-p-proceso" aria-hidden="true">🧪</div>
-              <div className="traz-cuerpo">
-                <div className="traz-etapa">Proceso {i + 1}</div>
-                <div className="traz-titulo-paso">
-                  {p.proceso?.nombre}
+          procesos.map((p, i) => {
+            const nombreProc = (p.proceso?.nombre ?? '').toLowerCase()
+            const esCata = nombreProc.includes('cata') || nombreProc.includes('cat.')
+            return (
+              <div className="traz-paso" key={`proc-${i}`}>
+                <div
+                  className={`traz-punto ${esCata ? 'traz-p-cata' : 'traz-p-proceso'}`}
+                  aria-hidden="true"
+                >
+                  {esCata ? '🔬' : '🧪'}
                 </div>
-                <div className="traz-detalle">
-                  Fase de beneficio del café. Es aquí donde se define parte
-                  importante del sabor y aroma que vas a percibir en la taza.
-                </div>
-                <div className="traz-metadatos">
-                  {p.fecha_inicio && (
-                    <span className="traz-meta">
-                      🟢 Inicio <strong>{fmtCortaFecha(p.fecha_inicio)}</strong>
-                    </span>
-                  )}
-                  {p.fecha_fin && (
-                    <span className="traz-meta">
-                      🔴 Fin <strong>{fmtCortaFecha(p.fecha_fin)}</strong>
-                    </span>
-                  )}
-                  {p.responsable && (
-                    <span className="traz-meta">
-                      👤 Por <strong>{p.responsable}</strong>
-                    </span>
+                <div className="traz-cuerpo">
+                  <div className="traz-etapa">
+                    {esCata ? 'Evaluación de calidad' : `Proceso ${i + 1}`}
+                  </div>
+                  <div className="traz-titulo-paso">
+                    {p.proceso?.nombre}
+                  </div>
+                  <div className="traz-detalle">
+                    {esCata
+                      ? <>Un catador profesional probó este lote y evaluó su calidad en taza: aroma, cuerpo, acidez y sabor.</>
+                      : <>Fase de beneficio del café. Es aquí donde se define parte importante del sabor y aroma que vas a percibir en la taza.</>}
+                  </div>
+                  <div className="traz-metadatos">
+                    {p.calificacion !== null && p.calificacion !== undefined && (
+                      <span className="traz-meta">
+                        ⭐ Puntaje <strong>{Number(p.calificacion).toFixed(1)}</strong>
+                      </span>
+                    )}
+                    {p.fecha_inicio && (
+                      <span className="traz-meta">
+                        🟢 Inicio <strong>{fmtCortaFecha(p.fecha_inicio)}</strong>
+                      </span>
+                    )}
+                    {p.fecha_fin && (
+                      <span className="traz-meta">
+                        🔴 Fin <strong>{fmtCortaFecha(p.fecha_fin)}</strong>
+                      </span>
+                    )}
+                  </div>
+                  {p.notas && (
+                    <div
+                      style={{
+                        marginTop: '0.6rem',
+                        padding: '0.5rem 0.75rem',
+                        background: 'rgba(107,68,35,0.06)',
+                        borderLeft: '3px solid var(--primary)',
+                        borderRadius: '0 6px 6px 0',
+                        fontSize: '0.9rem',
+                        color: 'var(--text-soft)',
+                        fontStyle: 'italic',
+                      }}
+                    >
+                      📝 {p.notas}
+                    </div>
                   )}
                 </div>
               </div>
-            </div>
-          ))
+            )
+          })
         ) : (
           <div className="traz-paso">
             <div className="traz-punto traz-p-proceso" aria-hidden="true">🧪</div>
