@@ -196,13 +196,35 @@ export default function Movimientos() {
     if (form.tipo === 'salida' && !form.idalmacen_origen) { setFormError('Salida requiere almacén origen.'); return }
 
     setSaving(true); setFormError(null)
-    const payload = {
-      tipo: form.tipo, fecha_movimiento: form.fecha_movimiento || new Date().toISOString(),
-      cantidad: Number(form.cantidad), idlote_cafe: Number(form.idlote_cafe),
-      idalmacen_origen: form.idalmacen_origen ? Number(form.idalmacen_origen) : null,
-      idalmacen_destino: form.idalmacen_destino ? Number(form.idalmacen_destino) : null,
-      idusuario_responsable: form.idusuario_responsable ? Number(form.idusuario_responsable) : null,
-      notas: form.notas || null,
+    const toIntOrNull = (v: any): number | null => {
+      if (v === '' || v === null || v === undefined) return null
+      const n = Number(v)
+      return Number.isFinite(n) && Number.isInteger(n) ? n : null
+    }
+    const toIntStrict = (v: any, campo: string): number | null => {
+      const n = toIntOrNull(v)
+      if (n === null) { setFormError(`Campo "${campo}" inválido.`); return null }
+      return n
+    }
+
+    const idLoteNum = toIntStrict(form.idlote_cafe, 'lote')
+    const cantidadNum = Number(form.cantidad)
+    if (idLoteNum === null) { setSaving(false); return }
+    if (!Number.isFinite(cantidadNum) || cantidadNum <= 0) {
+      setFormError('Cantidad inválida.'); setSaving(false); return
+    }
+
+    const payload: Record<string, any> = {
+      tipo: form.tipo,
+      fecha_movimiento: form.fecha_movimiento
+        ? new Date(form.fecha_movimiento).toISOString()
+        : new Date().toISOString(),
+      cantidad: cantidadNum,
+      idlote_cafe: idLoteNum,
+      idalmacen_origen:  toIntOrNull(form.idalmacen_origen),
+      idalmacen_destino: toIntOrNull(form.idalmacen_destino),
+      idusuario_responsable: toIntOrNull(form.idusuario_responsable),
+      notas: form.notas?.trim() || null,
     }
     let err: any
     if (editRecord) {
