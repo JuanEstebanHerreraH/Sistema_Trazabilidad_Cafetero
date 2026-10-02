@@ -148,28 +148,51 @@
   font-weight: 700;
   margin-top: 0.2rem;
 }
+/* ── Price box: layout vertical, nunca se corta ──────────────── */
 .portal-layout .price-box {
   background: linear-gradient(135deg, var(--primary) 0%, var(--primary-deep) 100%);
-  color: var(--primary-fg);
-  padding: 1rem 1.2rem;
+  color: #FFFFFF;
+  padding: 0.95rem 1.2rem;
   border-radius: var(--r-lg);
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-top: 0.4rem;
-  box-shadow: 0 2px 8px var(--primary-glow);
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
+  margin-top: 0.5rem;
+  box-shadow: 0 3px 10px var(--primary-glow);
+  position: relative;
+  overflow: hidden;
+}
+/* Detalle decorativo café — vaina de grano estilizada */
+.portal-layout .price-box::after {
+  content: '☕';
+  position: absolute;
+  right: 0.85rem;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 2.2rem;
+  opacity: 0.18;
+  pointer-events: none;
 }
 .portal-layout .price-label {
-  font-size: 0.85rem;
-  opacity: 0.9;
-  font-weight: 600;
+  font-size: 0.78rem;
+  opacity: 0.88;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #FFFFFF;
 }
 .portal-layout .price-value {
   font-family: var(--font-display);
-  font-size: 1.4rem;
-  font-weight: 700;
+  font-size: clamp(1.25rem, 2.5vw + 0.5rem, 1.65rem);
+  font-weight: 800;
+  line-height: 1.1;
+  color: #FFFFFF;
   overflow-wrap: break-word;
   word-break: break-word;
+  padding-right: 2.4rem; /* espacio para el ☕ decorativo */
+  width: 100%;
+  letter-spacing: -0.01em;
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -368,10 +391,6 @@
 
 @media (max-width: 480px) {
   .portal-layout .lote-stats { grid-template-columns: 1fr; }
-  .portal-layout .price-box {
-    flex-direction: column;
-    gap: 0.5rem;
-    text-align: center;
-  }
-  .portal-layout .price-value { font-size: 1.4rem; }
+  .portal-layout .price-box { padding: 0.9rem 1rem; }
+  .portal-layout .price-box::after { font-size: 1.9rem; right: 0.7rem; }
 }
