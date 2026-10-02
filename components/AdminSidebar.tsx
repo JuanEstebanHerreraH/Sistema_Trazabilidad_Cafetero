@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '../utils/supabase/client'
 import { useState, useEffect } from 'react'
+import ThemeToggle from './ThemeToggle'
 
 type NavItem =
   | { section: string }
@@ -114,6 +115,12 @@ export default function AdminSidebar({ userName = '', userEmail = '' }: Props) {
         </nav>
 
         <div className="sidebar-footer">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+            <ThemeToggle size="sm" />
+            <span style={{ fontSize: '0.8rem', color: 'var(--text-dim)', fontWeight: 600 }}>
+              Cambiar tema
+            </span>
+          </div>
           <button className="sidebar-logout" onClick={handleLogout}>
             <span>🚪</span>
             <span>Cerrar sesión</span>
