@@ -2,6 +2,18 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { createClient } from '../../utils/supabase/client'
 import FilterBar from '../FilterBar'
+import MiniBarChart, { MiniBarPoint } from '../MiniBarChart'
+
+// Formato compacto para evitar que números grandes se corten en las cards.
+// $15.000.000 → $15M · $1.500.000 → $1.5M · $500.000 → $500K
+function fmtMoneyCompact(n: number): string {
+  if (n >= 1_000_000) {
+    const v = n / 1_000_000
+    return `$${v >= 10 ? Math.round(v) : v.toFixed(1)}M`
+  }
+  if (n >= 1_000) return `$${Math.round(n / 1_000)}K`
+  return `$${n.toLocaleString('es-CO')}`
+}
 
 interface UsuarioPortal { idusuario: number; nombre: string; email: string }
 interface Finca { idfinca: number; nombre: string; ubicacion: string | null; area_hectareas: number | null }
@@ -184,7 +196,7 @@ export default function PortalProductor({ usuario }: { usuario: UsuarioPortal })
           { icon: '🌿', label: 'Mis fincas',     val: fincas.length,             color: 'var(--green)',   onClick: () => setTab('fincas') },
           { icon: '☕', label: 'Total lotes',     val: lotes.length,              color: 'var(--primary)', onClick: () => setTab('lotes') },
           { icon: '✅', label: 'Kg disponibles', val: `${totalKgDisponible} kg`, color: 'var(--amber)',   onClick: () => setTab('lotes') },
-          { icon: '💵', label: 'Ganancias',      val: `$${totalGanancias.toLocaleString('es-CO')}`, color: 'var(--green)', onClick: () => setTab('ganancias') },
+          { icon: '💵', label: 'Ganancias',      val: fmtMoneyCompact(totalGanancias), color: 'var(--green)', onClick: () => setTab('ganancias') },
         ].map(s => (
           <div key={s.label} className="stat-card" style={{ '--accent': s.color, cursor: 'pointer' } as any} onClick={s.onClick}>
             <div className="stat-icon">{s.icon}</div>
@@ -289,20 +301,64 @@ export default function PortalProductor({ usuario }: { usuario: UsuarioPortal })
       ) : (
         /* ── Tab Ganancias ─────────────────────────────────────────────────── */
         <div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '0.75rem', marginBottom: '1.25rem' }}>
+          <div className="stats-grid">
             {[
-              { icon: '💵', label: 'Ganancias totales', val: `$${totalGanancias.toLocaleString('es-CO')} COP`, color: 'var(--green)' },
-              { icon: '📦', label: 'Ventas registradas', val: ganancias.length, color: 'var(--blue)' },
+              { icon: '💵', label: 'Ganancias totales',
+                val: fmtMoneyCompact(totalGanancias),
+                hint: totalGanancias > 0 ? `${totalGanancias.toLocaleString('es-CO')} COP` : undefined,
+                color: 'var(--green)' },
+              { icon: '📦', label: 'Ventas registradas', val: String(ganancias.length), color: 'var(--blue)' },
               { icon: '⚖️', label: 'Kg vendidos', val: `${totalKgVendido.toLocaleString('es-CO')} kg`, color: 'var(--primary)' },
-              { icon: '🌿', label: 'Fincas activas', val: fincas.length, color: 'var(--amber)' },
+              { icon: '🌿', label: 'Fincas activas', val: String(fincas.length), color: 'var(--amber)' },
             ].map(s => (
-              <div key={s.label} className="stat-card" style={{ '--accent': s.color } as any}>
+              <div
+                key={s.label}
+                className="stat-card"
+                style={{ '--accent': s.color } as any}
+                title={s.hint}
+              >
                 <div className="stat-icon">{s.icon}</div>
-                <div className="stat-value" style={{ fontSize: '1rem' }}>{s.val}</div>
+                <div className="stat-value">{s.val}</div>
                 <div className="stat-label">{s.label}</div>
               </div>
             ))}
           </div>
+
+          {/* ── Gráfico: ganancias por mes (últimos 6 meses) ── */}
+          {(() => {
+            if (ganancias.length === 0) return null
+            // Agrupar por mes YYYY-MM
+            const porMes = new Map<string, number>()
+            for (const g of ganancias) {
+              if (!g.fecha_venta) continue
+              const d = new Date(g.fecha_venta)
+              if (isNaN(d.getTime())) continue
+              const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+              porMes.set(key, (porMes.get(key) ?? 0) + g.ganancia)
+            }
+            // Tomar últimos 6 meses con datos
+            const entries = Array.from(porMes.entries()).sort(([a], [b]) => a.localeCompare(b)).slice(-6)
+            if (entries.length === 0) return null
+            const meses = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
+            const data: MiniBarPoint[] = entries.map(([key, val]) => {
+              const [, m] = key.split('-')
+              return {
+                label: meses[parseInt(m, 10) - 1] ?? m,
+                value: val,
+                valueLabel: fmtMoneyCompact(val),
+              }
+            })
+            return (
+              <MiniBarChart
+                data={data}
+                title="📊 Ganancias por mes"
+                subtitle={entries.length === 1 ? '1 mes con ventas' : `últimos ${entries.length} meses con ventas`}
+                height={160}
+                accentVar="--green"
+                formatValue={fmtMoneyCompact}
+              />
+            )
+          })()}
 
           <FilterBar
             selects={[
