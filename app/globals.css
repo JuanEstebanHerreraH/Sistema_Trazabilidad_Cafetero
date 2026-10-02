@@ -1,10 +1,15 @@
 /* ═══════════════════════════════════════════════════════════════
-   CAFÉTRACE — Design System v2
-   Aesthetic: Dark espresso luxury · Colombian terroir
+   CAFÉTRACE — Design System v3 (dual-theme)
+   Dark: espresso luxury · Light: café latte
    Fonts: Fraunces (display) + Outfit (body)
+   Toggle persistido en localStorage.cafetrace-theme
 ═══════════════════════════════════════════════════════════════ */
 
-:root {
+/* ─── DARK THEME (default) ───────────────────────────────────── */
+:root,
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
   /* Background layers */
   --bg:          #080604;
   --bg-1:        #0f0b07;
@@ -19,50 +24,120 @@
   --border-soft: #1a1209;
   --border-med:  #2e2010;
 
-  /* Text (contraste subido para accesibilidad — antes: b8895a / 7a5535 / 3d2a14) */
+  /* Text */
   --text:       #f5ead6;
   --text-soft:  #d4a473;
   --text-dim:   #b08553;
   --text-muted: #8a6540;
 
-  /* Brand: warm amber-gold */
+  /* Brand */
   --primary:        #c47a2c;
   --primary-h:      #d98c38;
   --primary-deep:   #a3641e;
-  --primary-fg:     #08060400;
+  --primary-fg:     #FFFFFF;
   --primary-glow:   rgba(196,122,44,0.18);
   --primary-ring:   rgba(196,122,44,0.3);
   --primary-subtle: rgba(196,122,44,0.08);
 
-  /* Semantic colors */
+  /* Semantic */
   --danger:    #b03030;
   --danger-h:  #c43838;
   --green:     #2fa84f;
-  --green-bg:  rgba(47,168,79,0.1);
+  --green-bg:  rgba(47,168,79,0.12);
   --amber:     #e8960c;
-  --amber-bg:  rgba(232,150,12,0.1);
+  --amber-bg:  rgba(232,150,12,0.12);
   --blue:      #3b82f6;
-  --blue-bg:   rgba(59,130,246,0.1);
+  --blue-bg:   rgba(59,130,246,0.12);
   --purple:    #9b72d4;
-  --purple-bg: rgba(155,114,212,0.1);
+  --purple-bg: rgba(155,114,212,0.12);
   --red:       #e05050;
-  --red-bg:    rgba(224,80,80,0.1);
+  --red-bg:    rgba(224,80,80,0.12);
   --teal:      #14b8a6;
-  --teal-bg:   rgba(20,184,166,0.1);
+  --teal-bg:   rgba(20,184,166,0.12);
 
-  /* Radius */
-  --r:    5px;
+  /* Shadows (dark) */
+  --shadow-sm: 0 2px 8px rgba(0,0,0,0.3);
+  --shadow-md: 0 4px 16px rgba(0,0,0,0.4);
+  --shadow-lg: 0 8px 32px rgba(0,0,0,0.5);
+}
+
+/* ─── LIGHT THEME (café latte) ───────────────────────────────── */
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  /* Background layers — café + crema cálidos */
+  --bg:          #EFE5D1;
+  --bg-1:        #E8DCC3;
+  --bg-card:     #FFF8EC;
+  --bg-sidebar:  #E8DCC3;
+  --bg-hover:    #E0D1B2;
+  --bg-input:    #FFFFFF;
+  --bg-elevated: #FFFFFF;
+
+  /* Borders */
+  --border:      #C9B48E;
+  --border-soft: #DCCCA8;
+  --border-med:  #A8906A;
+
+  /* Text (contraste alto sobre crema) */
+  --text:       #2C1810;
+  --text-soft:  #4A2E1A;
+  --text-dim:   #6B4423;
+  --text-muted: #8B6540;
+
+  /* Brand — café más intenso en claro */
+  --primary:        #6B4423;
+  --primary-h:      #55361C;
+  --primary-deep:   #3F2814;
+  --primary-fg:     #FFFFFF;
+  --primary-glow:   rgba(107,68,35,0.18);
+  --primary-ring:   rgba(107,68,35,0.3);
+  --primary-subtle: rgba(107,68,35,0.08);
+
+  /* Semantic — más saturados sobre fondo claro */
+  --danger:    #B03A2E;
+  --danger-h:  #922E24;
+  --green:     #4A6741;
+  --green-bg:  rgba(74,103,65,0.14);
+  --amber:     #B8621B;
+  --amber-bg:  rgba(184,98,27,0.14);
+  --blue:      #2C5282;
+  --blue-bg:   rgba(44,82,130,0.12);
+  --purple:    #6B3FA0;
+  --purple-bg: rgba(107,63,160,0.12);
+  --red:       #B03A2E;
+  --red-bg:    rgba(176,58,46,0.12);
+  --teal:      #285E61;
+  --teal-bg:   rgba(40,94,97,0.12);
+
+  /* Shadows (light) — más sutiles pero visibles */
+  --shadow-sm: 0 2px 8px rgba(107,68,35,0.08);
+  --shadow-md: 0 4px 16px rgba(107,68,35,0.12);
+  --shadow-lg: 0 8px 32px rgba(107,68,35,0.16);
+}
+
+:root {
+  /* Shared tokens — iguales en ambos temas */
+  --r:    6px;
   --r-md: 10px;
   --r-lg: 14px;
   --r-xl: 20px;
 
-  /* Layout */
   --sidebar-w: 250px;
-  --t: 0.15s ease;
+  --t: 0.18s ease;
 
-  /* Typography */
   --font-display: 'Fraunces', Georgia, serif;
   --font-body:    'Outfit', system-ui, sans-serif;
+}
+
+/* Transición suave al cambiar de tema (solo elementos no-interactivos
+   para no afectar animaciones de hover). */
+body, .btn, .form-input, .form-select, .form-textarea,
+.stat-card, .lote-card, .portal-header, .dash-sidebar,
+.dash-main, .trazabilidad-timeline, .admin-section,
+.table-wrapper, .modal-content {
+  transition: background-color 0.3s ease, color 0.3s ease,
+              border-color 0.3s ease;
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -418,7 +493,7 @@ input, select, textarea { font-family: var(--font-body); }
 ═══════════════════════════════════════════════════════════ */
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(185px, 1fr));
   gap: 1rem;
   margin-bottom: 1.75rem;
 }
@@ -430,30 +505,46 @@ input, select, textarea { font-family: var(--font-body); }
   padding: 1.1rem 1.25rem;
   position: relative;
   overflow: hidden;
-  transition: border-color var(--t);
+  transition: border-color var(--t), transform var(--t), box-shadow var(--t);
+  min-width: 0; /* critical: permite shrink dentro del grid */
 }
 
 .stat-card::after {
   content: '';
   position: absolute;
   top: 0; left: 0; right: 0;
-  height: 2px;
+  height: 3px;
   background: var(--accent, var(--primary));
-  opacity: 0.6;
+  opacity: 0.8;
 }
 
-.stat-card:hover { border-color: var(--border-med); }
+.stat-card:hover {
+  border-color: var(--border-med);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
 
-.stat-icon { font-size: 1.2rem; margin-bottom: 0.6rem; opacity: 0.8; }
+.stat-icon { font-size: 1.4rem; margin-bottom: 0.6rem; opacity: 0.9; }
+
+/* clamp + overflow-wrap: números largos nunca se cortan */
 .stat-value {
   font-family: var(--font-display);
-  font-size: 1.6rem;
+  font-size: clamp(1.1rem, 2.2vw + 0.4rem, 1.75rem);
   font-weight: 700;
   color: var(--accent, var(--primary));
-  line-height: 1;
-  margin-bottom: 0.2rem;
+  line-height: 1.05;
+  margin-bottom: 0.25rem;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  min-width: 0;
 }
-.stat-label { font-size: 0.72rem; color: var(--text-dim); font-weight: 500; }
+
+.stat-label {
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
 
 /* ═══════════════════════════════════════════════════════════
    TOOLBAR
@@ -1521,3 +1612,98 @@ input, select, textarea { font-family: var(--font-body); }
 .sort-icon { font-size: 0.7rem; margin-left: 0.3rem; opacity: 0.5; }
 .sort-icon.asc, .sort-icon.desc { opacity: 1; color: var(--primary); }
 
+
+/* ═══════════════════════════════════════════════════════════
+   THEME TOGGLE (botón sol/luna)
+═══════════════════════════════════════════════════════════ */
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
+  border: 2px solid var(--border-med);
+  background: var(--bg-card);
+  color: var(--text-soft);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all var(--t);
+  padding: 0;
+  flex-shrink: 0;
+}
+.theme-toggle:hover {
+  color: var(--primary);
+  border-color: var(--primary);
+  transform: rotate(15deg);
+}
+.theme-toggle svg {
+  width: 22px;
+  height: 22px;
+}
+/* Variante pequeña para sidebar */
+.theme-toggle.theme-toggle-sm {
+  width: 38px;
+  height: 38px;
+  min-height: 38px;
+}
+.theme-toggle.theme-toggle-sm svg { width: 18px; height: 18px; }
+
+/* ═══════════════════════════════════════════════════════════
+   MINI BAR CHART
+═══════════════════════════════════════════════════════════ */
+.mini-chart {
+  background: var(--bg-card);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r-xl);
+  padding: 1.25rem 1.1rem 1rem;
+  margin-bottom: 1.25rem;
+}
+.mini-chart-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 0.75rem;
+}
+.mini-chart-title {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0;
+}
+.mini-chart-sub {
+  font-size: 0.82rem;
+  color: var(--text-dim);
+}
+.mini-chart svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.mini-chart-bar {
+  fill: var(--primary);
+  transition: fill var(--t);
+}
+.mini-chart-bar:hover { fill: var(--primary-h); }
+.mini-chart-axis {
+  stroke: var(--border);
+  stroke-width: 1;
+}
+.mini-chart-label {
+  font-size: 10px;
+  fill: var(--text-muted);
+  font-family: var(--font-body);
+}
+.mini-chart-value {
+  font-size: 10px;
+  fill: var(--text-soft);
+  font-family: var(--font-body);
+  font-weight: 600;
+}
+.mini-chart-empty {
+  text-align: center;
+  color: var(--text-muted);
+  padding: 2rem 1rem;
+  font-size: 0.9rem;
+}
