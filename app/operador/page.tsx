@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { createClient } from '../../utils/supabase/client'
+import ThemeToggle from '../../components/ThemeToggle'
 
 interface UsuarioPortal { idusuario: number; nombre: string; email: string }
 
@@ -256,6 +257,7 @@ function PortalOperador({ usuario, onLogout }: { usuario: UsuarioPortal; onLogou
             <div style={{ fontSize: '0.84rem', color: 'var(--text)', fontWeight: 600 }}>{usuario.nombre}</div>
             <div style={{ fontSize: '0.68rem', color: 'var(--text-dim)' }}>{usuario.email}</div>
           </div>
+          <ThemeToggle size="sm" />
           <button className="btn btn-secondary btn-sm" onClick={onLogout}>Salir</button>
         </div>
       </header>
