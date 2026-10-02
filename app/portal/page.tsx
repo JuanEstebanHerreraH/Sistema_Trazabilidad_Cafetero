@@ -6,6 +6,7 @@ import PortalProductor from '../../components/portal/PortalProductor'
 import PortalCatador from '../../components/portal/PortalCatador'
 import PortalTransportista from '../../components/portal/PortalTransportista'
 import CafeLogo from '../../components/CafeLogo'
+import ThemeToggle from '../../components/ThemeToggle'
 
 interface UsuarioPortal {
   idusuario: number
@@ -134,11 +135,12 @@ export default function PortalPage() {
             </div>
           </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
           <div className="cafe-user-info">
             <div className="cafe-user-name">{usuario.nombre}</div>
             <div className="cafe-user-email">{usuario.email}</div>
           </div>
+          <ThemeToggle />
           <button className="btn btn-secondary btn-sm" onClick={handleLogout} aria-label="Cerrar sesión">
             🚪 Salir
           </button>
