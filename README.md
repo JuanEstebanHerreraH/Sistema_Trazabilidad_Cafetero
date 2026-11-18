@@ -77,7 +77,7 @@ npm run build
 npm start
 ~~~
 
-El script `npm run lint` está definido en package.json. No se documenta una suite automática de pruebas como si ya estuviera ejecutada.
+El script `npm run lint` está definido en package.json.
 
 ### Publicar tu propia instancia
 
